@@ -5,6 +5,7 @@ library(tidyverse)
 library(raster)
 library(plotly)
 library(htmlwidgets)
+library(rgl)
 
 tempd <- tempdir()
 r.list <- list()
@@ -27,7 +28,7 @@ if (sfact > 1)
   elevations <- raster::aggregate(elevations,fact=sfact,fun=mean,
                            expand=TRUE,na.rm=TRUE)
 print(paste0(elevations@ncols," columns by ",elevations@nrows," rows"))
-elevations[is.na(elevations)] <- -100
+elevations[is.na(elevations)] <- 0
 mmm <- raster::as.matrix(elevations)
 mmm <- mmm[,ncol(mmm):1]  #  flip east/west since row 1 is top
 
@@ -48,4 +49,32 @@ p <- plotly::plot_ly(z = ~mmm,
 p
 htmlwidgets::saveWidget(p,paste0(datadir,"/",state," map.html"))
 
+mmmrgl <- raster::as.matrix(elevations)
+x <- seq(1,length.out=nrow(mmmrgl))
+y <- seq(1,length.out=ncol(mmmrgl))
+
+terrcolors <- colorRampPalette(c("blue","turquoise","aquamarine",
+                                 "palegreen","yellowgreen",
+                                 "chartreuse","greenyellow","green",
+                                 "limegreen","forestgreen","darkgreen",
+                                 "yellow","gold","goldenrod",
+                                 "sienna","brown","gray75",
+                                 "gray85","gray95","gray97","white"))(201)
+colidx <- floor(200*(mmmrgl/1500)) + 1
+colidx[colidx>201] <- 201
+colidx[colidx<1] <- 1
+col <- terrcolors[colidx]
+
+rgl::par3d("windowRect"= c(100,100,1200,1000))
+userMatrix <- matrix(c(-0.02,-0.80,0.632,0,1,0,0.04,0,
+                       -0.03,0.60,0.80,0,0,0,0,1),ncol=4,nrow=4)
+rgl::rgl.clear()
+rgl::surface3d(x,y,mmmrgl,color=col)
+rgl::material3d(alpha=1.0,point_antialias=TRUE,smooth=TRUE,shininess=0)
+rgl::aspect3d(x=1,y=1/1.4,z=0.02)
+rgl::rgl.clear("lights")
+rgl::rgl.light(theta = 0, phi = 25,
+               viewpoint.rel=TRUE, specular="black")
+rgl::rgl.viewpoint(userMatrix=userMatrix,type="modelviewpoint")
+rgl::writeWebGL(dir=paste0(datadir), filename=paste0(datadir,"/",state," rgl map.html"))
 
