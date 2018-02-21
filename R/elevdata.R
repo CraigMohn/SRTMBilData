@@ -1,11 +1,33 @@
 state <- "WA"
 datadir <- "c:/bda"
+highelevation <- 1500
+
+# put the srtm data zip files in directory datadir/state
+# maps and .rda file with elevations are put in datadir
 
 library(tidyverse)
 library(raster)
 library(plotly)
 library(htmlwidgets)
 library(rgl)
+
+yRatio <- function(rrr) {
+  xmin <- rrr@extent@xmin
+  xmax <- rrr@extent@xmax
+  ymin <- rrr@extent@ymin
+  ymax <- rrr@extent@ymax
+  return(yRatioPts(xmin,xmax,ymin,ymax))
+}
+yRatioPts <- function(xmin,xmax,ymin,ymax) {
+  width <-
+    (raster::pointDistance(cbind(xmin,ymin),cbind(xmax,ymin),lonlat=TRUE) +
+       raster::pointDistance(cbind(xmin,ymax),cbind(xmax,ymax),lonlat=TRUE)) / 2
+  height <-
+    (raster::pointDistance(cbind(xmin,ymin),cbind(xmin,ymax),lonlat=TRUE) +
+       raster::pointDistance(cbind(xmax,ymin),cbind(xmax,ymax),lonlat=TRUE)) / 2
+  return(height/width)
+}
+
 
 tempd <- tempdir()
 r.list <- list()
@@ -28,6 +50,7 @@ if (sfact > 1)
   elevations <- raster::aggregate(elevations,fact=sfact,fun=mean,
                            expand=TRUE,na.rm=TRUE)
 print(paste0(elevations@ncols," columns by ",elevations@nrows," rows"))
+yscale <- yRatio(elevations)
 elevations[is.na(elevations)] <- 0
 mmm <- raster::as.matrix(elevations)
 mmm <- mmm[,ncol(mmm):1]  #  flip east/west since row 1 is top
@@ -43,7 +66,7 @@ p <- plotly::plot_ly(z = ~mmm,
   plotly::add_surface(opacity=1.0) %>%
   plotly::layout(scene=list(xaxis=ax,yaxis=ay,zaxis=az,
                             aspectmode = "manual",
-                            aspectratio = list(x=1,y=1/1.4,z=0.03),
+                            aspectratio = list(x=1,y=yscale,z=0.03),
                             camera=list(up=c(0,1,0),
                                         eye=c(0,1.25,0)) ) )
 p
@@ -60,7 +83,7 @@ terrcolors <- colorRampPalette(c("blue","turquoise","aquamarine",
                                  "yellow","gold","goldenrod",
                                  "sienna","brown","gray75",
                                  "gray85","gray95","gray97","white"))(201)
-colidx <- floor(200*(mmmrgl/1500)) + 1
+colidx <- floor(200*(mmmrgl/highelevation)) + 1
 colidx[colidx>201] <- 201
 colidx[colidx<1] <- 1
 col <- terrcolors[colidx]
@@ -71,7 +94,7 @@ userMatrix <- matrix(c(-0.02,-0.80,0.632,0,1,0,0.04,0,
 rgl::rgl.clear()
 rgl::surface3d(x,y,mmmrgl,color=col)
 rgl::material3d(alpha=1.0,point_antialias=TRUE,smooth=TRUE,shininess=0)
-rgl::aspect3d(x=1,y=1/1.4,z=0.02)
+rgl::aspect3d(x=1,y=1/yscale,z=0.02)
 rgl::rgl.clear("lights")
 rgl::rgl.light(theta = 0, phi = 25,
                viewpoint.rel=TRUE, specular="black")
