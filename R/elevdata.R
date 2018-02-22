@@ -1,6 +1,29 @@
-state <- "WA"
-datadir <- "c:/bda"
-highelevation <- 3000
+maplist <- c("WA","HI","OR","CA",
+                  "ID","UT","NV","AZ","NM",
+                  "CO","MN","DelMarVA+NC+WV","WY","MT")
+statelist <- list("WA","HI","OR","CA",
+                  "ID","UT","NV","AZ","NM",
+                  "CO","MN",c("DE","MD","VA","NC","WV"),"WY","MT")
+bestmaxelev <- c(3000,2000,3000,3000,
+                 3000,3500,3000,3000,3500,
+                 3500,1500,1500,3500,3500)
+
+stateregion <- "ID"
+res3dplot <- 1300
+trimraster <- TRUE
+
+datadir <- "c:/bda"                    #  trimmed elevation raster data location
+statedatadir <- "c:/bda/states"        #  zip file subdirectories
+mapoutputdir <- "c:/bda/maps3d"        #  map file outputs 
+#################################################################################
+assign("last.warning", NULL, envir = baseenv())
+
+
+
+if (sum(maplist==stateregion)!=1) stop("map state/region error")
+highelevation <- bestmaxelev[[which.max(maplist==stateregion)]]
+stateMask <- ifelse(trimraster,statelist[[which.max(maplist==stateregion)]],"")
+state <- stateregion
 
 # put the srtm data zip files in directory datadir/state
 # maps and .rda file with elevations are put in datadir
@@ -10,6 +33,10 @@ library(raster)
 library(plotly)
 library(htmlwidgets)
 library(rgl)
+library(sp)
+library(rgdal)
+library(rgeos)
+library(tigris)
 
 yRatio <- function(rrr) {
   xmin <- rrr@extent@xmin
@@ -52,27 +79,68 @@ pan3d <- function(button) {
 }
 
 
+if (stateMask != "") {
+  #state <- rgdal::readOGR(dsn = path.data, layer = "usa_state_shapefile")
+  #projection(state) <- rgdal::CRS("+proj=longlat +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +no_defs")
+  #state.sub <- state[as.character(state@data$STATE_NAME) %in% stateMask, ]
+  state.sub <- rgeos::gUnaryUnion(tigris::counties(stateMask))
+  projection(state.sub) <- CRS("+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs")
+  plot(state.sub)
+}
+
 tempd <- tempdir()
 r.list <- list()
-fn <- list.files(path=paste0(datadir,"/",state),pattern="*.zip")
+fn <- list.files(path=paste0(statedatadir,"/",state),pattern="*.zip")
 rn <- gsub("_bil","",tools::file_path_sans_ext(fn))
+j <- 1
 for (i in 1:length(fn)) {
-  print(paste0(datadir,"/",state,"/",fn[[i]]))
-  unzip(paste0(datadir,"/",state,"/",fn[[i]]),exdir=tempd)
-  r.list[[i]] <- raster(paste0(tempd,"/",rn[[i]],".bil"))
+  print(paste0(statedatadir,"/",state,"/",fn[[i]]))
+  unzip(paste0(statedatadir,"/",state,"/",fn[[i]]),exdir=tempd)
+  tmp <- raster(paste0(tempd,"/",rn[[i]],".bil"))
+  if (stateMask != "") {
+    xmin <- tmp@extent@xmin
+    xmax <- tmp@extent@xmax
+    ymin <- tmp@extent@ymin
+    ymax <- tmp@extent@ymax
+    pgon <- sp::Polygon(cbind(c(xmin,xmax,xmax,xmin,xmin),
+                              c(ymin,ymin,ymax,ymax,ymin)))
+    ei <- sp::SpatialPolygons(list(Polygons(list(pgon), ID = "1deg")),
+             proj4string=CRS("+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs"))
+    #ei <- as(extent(tmp), "SpatialPolygons",
+    #         proj4string=CRS("+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs"))
+    if (rgeos::gContainsProperly(state.sub, ei)) {
+      print("interior - not masked")
+    } else if (gIntersects(state.sub, ei)) {
+      print(system.time(
+               tmp <- raster::mask(raster::crop(tmp, extent(state.sub)),
+                                   state.sub)
+                        )[[3]])
+    } else {
+      print("exterior - not used")
+      tmp <- NULL
+    }
+    print(warnings())
+  }
+  if (!is.null(tmp)) {
+    r.list[[j]] <- tmp
+    j <- j + 1
+  }
 }
-m <- do.call(merge, r.list)
+m.sub <- do.call(merge, r.list)
 
-elevations <- readAll(m)  #  pull it all into memory to avoid complications
+elevations <- readAll(m.sub)  #  pull it all into memory to avoid complications
 save(elevations,file=paste0(datadir,"/",state,"elevs.rda"))
+#writeRaster(elevations,file=paste0(datadir,"/",state,"elevs.grd"))
 
 print(paste0(elevations@ncols," columns by ",elevations@nrows," rows"))
-sfact <- max(1,floor(max(elevations@ncols,elevations@nrows)/1500))
+sfact <- max(1,floor(max(elevations@ncols,elevations@nrows)/res3dplot))
 print(paste0("scaling raster down by a factor of ",sfact))
 if (sfact > 1)
   elevations <- raster::aggregate(elevations,fact=sfact,fun=mean,
                            expand=TRUE,na.rm=TRUE)
 print(paste0(elevations@ncols," columns by ",elevations@nrows," rows"))
+
+
 yscale <- yRatio(elevations)
 elevations[is.na(elevations)] <- 0
 mmm <- raster::as.matrix(elevations)
@@ -93,7 +161,7 @@ p <- plotly::plot_ly(z = ~mmm,
                             camera=list(up=c(0,1,0),
                                         eye=c(0,1.25,0)) ) )
 p
-htmlwidgets::saveWidget(p,paste0(datadir,"/",state," map.html"))
+htmlwidgets::saveWidget(p,paste0(mapoutputdir,"/",state," map.html"))
 
 mmmrgl <- raster::as.matrix(elevations)
 x <- seq(1,length.out=nrow(mmmrgl))
@@ -123,5 +191,5 @@ rgl::rgl.light(theta = 0, phi = 25,
                viewpoint.rel=TRUE, specular="black")
 rgl::rgl.viewpoint(userMatrix=userMatrix,type="modelviewpoint")
 pan3d(2)  # right button for panning, doesn't play well with zoom)
-rgl::writeWebGL(dir=paste0(datadir), filename=paste0(datadir,"/",state," rgl map.html"))
+rgl::writeWebGL(dir=paste0(mapoutputdir), filename=paste0(mapoutputdir,"/",state," rgl map.html"))
 
