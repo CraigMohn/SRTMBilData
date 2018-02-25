@@ -1,20 +1,46 @@
 maplist <- c("WA","HI","OR","CA",
-                  "ID","UT","NV","AZ","NM",
-                  "CO","MN","DelMarVA+NC+WV","WY","MT")
+             "ID","UT","NV","AZ",
+             "NM","CO","WY","MT","AK",
+             "MN","WI","MI","OH","IN","IL",
+             "ND","SD","IA","NE","KS","MO",
+             "NY","FL","OK",
+             "TX",
+             "DelMarVA-NC-WV",
+             "NewEngland",
+             "PA-NJ",
+             "AL-GA-SC",
+             "AR-LA-MS",
+             "TN-KY")
 statelist <- list("WA","HI","OR","CA",
-                  "ID","UT","NV","AZ","NM",
-                  "CO","MN",c("DE","MD","VA","NC","WV"),"WY","MT")
+                  "ID","UT","NV","AZ",
+                  "NM","CO","WY","MT","AK",
+                  "MN","WI","MI","OH","IN","IL",
+                  "ND","SD","IA","NE","KS","MO",
+                  "NY","FL","OK",
+                  "TX",
+                  c("DE","MD","DC","VA","NC","WV"),
+                  c("ME","NH","VT","MA","RI","CT"),
+                  c("PA","NJ"),
+                  c("AL","GA","SC"),
+                  c("AR","LA","MS"),
+                  c("TN","KY"))
 bestmaxelev <- c(3000,2000,3000,3000,
-                 3000,3500,3000,3000,3500,
-                 3500,1500,1500,3500,3500)
+                 3000,3500,3000,3000,
+                 3500,3500,3500,3500,
+                 1500,1500,1500,1500,1500,1500,
+                 1500,1500,1500,1500,1500,1500,
+                 1500,1500,1500,
+                 1500,
+                 1500,1500,1500,1500,1500)
 
-stateregion <- "ID"
+stateregion <- "TX" 
 res3dplot <- 1300
 trimraster <- TRUE
+lon0to360=FALSE
 
-datadir <- "c:/bda"                    #  trimmed elevation raster data location
-statedatadir <- "c:/bda/states"        #  zip file subdirectories
-mapoutputdir <- "c:/bda/maps3d"        #  map file outputs 
+datadir <- "c:/bda"                    #  trimmed elevation raster output data location
+statedatadir <- "c:/bda/states"        #  zip file input subdirectories location
+mapoutputdir <- "c:/bda/maps3d"        #  map file output location
 #################################################################################
 assign("last.warning", NULL, envir = baseenv())
 
@@ -22,8 +48,12 @@ assign("last.warning", NULL, envir = baseenv())
 
 if (sum(maplist==stateregion)!=1) stop("map state/region error")
 highelevation <- bestmaxelev[[which.max(maplist==stateregion)]]
-stateMask <- ifelse(trimraster,statelist[[which.max(maplist==stateregion)]],"")
 state <- stateregion
+if (trimraster) {
+  stateMask <- statelist[[which.max(maplist==stateregion)]]
+} else {
+  stateMask <- ""
+}
 
 # put the srtm data zip files in directory datadir/state
 # maps and .rda file with elevations are put in datadir
@@ -79,12 +109,10 @@ pan3d <- function(button) {
 }
 
 
-if (stateMask != "") {
-  #state <- rgdal::readOGR(dsn = path.data, layer = "usa_state_shapefile")
-  #projection(state) <- rgdal::CRS("+proj=longlat +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +no_defs")
-  #state.sub <- state[as.character(state@data$STATE_NAME) %in% stateMask, ]
+if (stateMask[[1]] != "") {
   state.sub <- rgeos::gUnaryUnion(tigris::counties(stateMask))
-  projection(state.sub) <- CRS("+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs")
+  raster::projection(state.sub) <- CRS("+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs")
+  #  rgeos::gbuffer
   plot(state.sub)
 }
 
@@ -92,12 +120,13 @@ tempd <- tempdir()
 r.list <- list()
 fn <- list.files(path=paste0(statedatadir,"/",state),pattern="*.zip")
 rn <- gsub("_bil","",tools::file_path_sans_ext(fn))
+unusedfn <- NULL
 j <- 1
 for (i in 1:length(fn)) {
   print(paste0(statedatadir,"/",state,"/",fn[[i]]))
   unzip(paste0(statedatadir,"/",state,"/",fn[[i]]),exdir=tempd)
   tmp <- raster(paste0(tempd,"/",rn[[i]],".bil"))
-  if (stateMask != "") {
+  if (stateMask[[1]] != "") {
     xmin <- tmp@extent@xmin
     xmax <- tmp@extent@xmax
     ymin <- tmp@extent@ymin
@@ -111,24 +140,28 @@ for (i in 1:length(fn)) {
     if (rgeos::gContainsProperly(state.sub, ei)) {
       print("interior - not masked")
     } else if (gIntersects(state.sub, ei)) {
-      print(system.time(
+      print(paste0("boundary - masking time = ",system.time(
                tmp <- raster::mask(raster::crop(tmp, extent(state.sub)),
                                    state.sub)
-                        )[[3]])
+                        ))[[3]])
     } else {
       print("exterior - not used")
+      unusedfn <- c(unusedfn,fn[[i]])
       tmp <- NULL
     }
-    print(warnings())
+    # print(warnings())
   }
   if (!is.null(tmp)) {
     r.list[[j]] <- tmp
     j <- j + 1
   }
 }
+print(paste0("unused data files = ",unusedfn))
+print(warnings())
 m.sub <- do.call(merge, r.list)
+if (lon0to360) m.sub <- raster::rotate(m.sub)
 
-elevations <- readAll(m.sub)  #  pull it all into memory to avoid complications
+elevations <- raster::readAll(m.sub)  #  pull it all into memory to avoid complications
 save(elevations,file=paste0(datadir,"/",state,"elevs.rda"))
 #writeRaster(elevations,file=paste0(datadir,"/",state,"elevs.grd"))
 
