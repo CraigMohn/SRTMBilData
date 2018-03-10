@@ -1,35 +1,3 @@
-USStatevec <- NULL #c("PacificNorthWest","AK")
-USParkvec <- NULL
-CAProvincevec <- c("BC")
-mapbuffer <- 2000     # meters
-cropbox <- extent(-180, 0, -55, 60)
-
-res3dplot <- 2500
-loadStateElevs <-  FALSE
-writeElevFile <- TRUE
-drawRGL <- TRUE
-saveRGL <- TRUE
-drawPlotly <- TRUE
-savePlotly <- TRUE
-lon0to360=FALSE
-
-datadir <- "c:/bda"                    #  trimmed elevation raster output data location
-NAmericaDataDir <- "c:/bda/NorthAmerica"        #  zip file input subdirectories location
-mapoutputdir <- "c:/bda/maps3d"        #  map file output location
-
-#################################################################################
-regionlist <- c("PacificNorthWest",
-                "MountainWest",
-                "DelMarVa",
-                "NewEngland")
-regionstates <- list(c("WA","OR","ID","MT"),
-                     c("WA","OR","ID","MT","WY","CO","UT","NV"),
-                     c("DE","MD","DC","VA"),
-                     c("ME","NH","VT","MA","RI","CT")
-                    )
-#################################################################################
-assign("last.warning", NULL, envir = baseenv())
-
 library(tidyverse)
 library(raster)
 library(plotly)
@@ -40,6 +8,52 @@ library(rgdal)
 library(rgeos)
 library(tigris)
 library(sf)
+
+USStatevec <-  "NM" #c("MountainWest","CA")
+USParkvec <- NULL # <- c("MORA") 
+CAProvincevec <- NULL #<- c("BC","AB","SK")
+worldCountryvec <- NULL #<- "AUS" #NULL # <- c("ESP","PRT","FRA") # http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html
+mapbuffer <- 5000     # meters, expands overall area
+mapmergebuffer <- 20  # meters, expands categories before merging with others
+#  southern slice of BC
+cropbox <- raster::extent(-180, 170, 0, 52.1)
+res3dplot <- 3300
+loadStateElevs <-  FALSE
+writeElevFile <- TRUE
+forceRes <- NULL
+maxrastercells <- 500000000
+highelevation <- 3000
+vertscale <- 1.0
+drawRGL <- TRUE
+saveRGL <- TRUE
+drawPlotly <- FALSE
+savePlotly <- FALSE
+lon0to360=FALSE
+
+datadir <- "c:/bda"                    #  base dir - subs include shapefiles, rasterfile 
+mapoutputdir <- "c:/bda/maps3d"        #  map file output location
+NAmericaDataDir <- "c:/bda/NorthAmerica"   #  zip file input subdirectories location
+EuropeDataDir <- "c:/bda/Europe 3s"        #  zip file input subdirectories location
+AustraliaDataDir <- "c:/bda/Australia 3s"        #  zip file input subdirectories location
+mapDataDir <- c(NAmericaDataDir,EuropeDataDir,AustraliaDataDir)[[1]]
+resstr <- c("_1arc_v3_bil","_3arc_v2_bil","_3arc_v2_bil")[[1]]
+
+
+#################################################################################
+regionlist <- c("PacificNorthWest",
+                "MountainWest",
+                "DelMarVa",
+                "NewEngland",
+                "Maritimes")
+regionstates <- list(c("WA","OR","ID","MT"),
+                     c("WA","OR","ID","MT","WY","CO","UT","NV"),
+                     c("DE","MD","DC","VA"),
+                     c("ME","NH","VT","MA","RI","CT"),
+                     c("NS","PE","NB","NL")
+                    )
+#################################################################################
+assign("last.warning", NULL, envir = baseenv())
+
 
 yRatio <- function(rrr) {
   xmin <- rrr@extent@xmin
@@ -81,24 +95,44 @@ pan3d <- function(button) {
   cat("Callbacks set on button", button, "of rgl device", rgl.cur(), "\n")
 }
 
-addmapfiles <- function(filenames,lonChar,minLon,maxLon,latChar,minLat,maxLat) {
+addmapfiles <- function(filenames,lonChar,minLon,maxLon,latChar,minLat,maxLat,
+                        resstr="_1arc_v3_bil") {
   #  first pass assume N and W quartersphere
-  if (minLat < maxLat) {
+  if (minLat <= maxLat) {
     for (lat in seq(minLat,maxLat)) {
-      if (minLon < maxLon) {
+      if (minLon <= maxLon) {
         for (lon in seq(minLon,maxLon))
           filenames <- c(filenames,
                          paste0(latChar,sprintf("%02d",lat),"_",lonChar,sprintf("%03d",lon),
-                                "_1arc_v3_bil.zip"))
+                                resstr,".zip"))
       }
     }
   }
   return(filenames)  
 }
+bufferUnion <- function(spObj,mapbuffer,mapunion,
+                        outCRS="+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs",
+                        bufferCRS="+init=epsg:3857",
+                        capStyle="FLAT",
+                        joinStyle="BEVEL",
+                        simplifytol=0) {
+  if (mapbuffer > 0) {
+    spObj <- rgeos::gBuffer(sp::spTransform( spObj, CRS( bufferCRS ) ),
+                            width=1.5*mapbuffer,
+                            capStyle=capStyle)
+    if (simplifytol > 0) spObj <- rgeos::gSimplify(spObj,tol=simplifytol)
+    spObj <- rgeos::gBuffer(spObj,width=-mapbuffer/2)
+  }    
+  spObj <- sp::spTransform( spObj, CRS( outCRS ) ) 
+  if (is.null(mapunion)) {
+    return(spObj)
+  } else {
+    return(rgeos::gUnaryUnion(raster::union(mapunion,spObj)))
+  } 
+}
 
 
 outputName <- paste0(c(USStatevec,CAProvincevec,USParkvec),collapse="-")
-highelevation <- 3000
 
 ####    set up crop shape file
 mapcrop <- NULL
@@ -111,47 +145,61 @@ if (!is.null(USStatevec)) {
       USStatevec <- union(USStatevec,toupper(regionstates[[i]]))
     }
   }
-  statesInMap <- c(statesInMap,USStatevec)
-  mcrop <- rgeos::gUnaryUnion(tigris::counties(statesInMap))
-  if (mapbuffer > 0) 
-    mcrop <- rgeos::gBuffer(sp::spTransform( mcrop, CRS( "+init=epsg:3857" ) ),
-                            width=mapbuffer)
-  mcrop <- sp::spTransform( mcrop, CRS( "+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs" ) ) 
-  if (is.null(mapcrop)) {
-    mapcrop <- mcrop
-  } else {
-    mapcrop <- rgeos::gUnaryUnion(raster::union(mapcrop,mcrop))
-  }
-} 
+  statesInMap <- union(statesInMap,USStatevec)
+  mcrop <- rgeos::gUnaryUnion(tigris::counties(statesInMap)) #sf dataframe
+  mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop)
+}
 if (!is.null(USParkvec)) {
-  parkareas <- sf::st_read(paste0(datadir,
-                                  "/ne_10m_parks_and_protected_lands",
-                                  "/ne_10m_parks_and_protected_lands_area.shp"))
-  
-  if (is.null(mapcrop)) {
-    mapcrop <- mcrop
-  } else {
-    mapcrop <- rgeos::gUnaryUnion(raster::union(mapcrop,mcrop))
-  } 
+  USParkvec <- unique(toupper(USParkvec))
+  statesInMap <- union(statesInMap,USParkvec)
+  pdir <- "nps_boundary"
+  pfile <- paste0(pdir,".shp")
+  parkareas <- sf::st_read(paste0(datadir,"/",pdir,"/",pfile))  # sf dataframe
+  parkareas <- rgeos::gUnaryUnion(parkareas)
+  #  parknames <- parkareas[,c("UNIT_NAME","UNIT_CODE")]
+  #  sf::st_geometry(parknames) <- NULL
+  #  parknames <- parknames[order(parknames$UNIT_CODE),]
+  #  write.csv(parknames,paste0(datadir,"/parknames.csv"))
+  parkareas <- parkareas[parkareas$UNIT_CODE %in% USParkvec,"geometry"]
+  mcrop <- as(parkareas, "Spatial")  
+  mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop)
 }
+
 if (!is.null(CAProvincevec)) {
-  CAProvincevec <- unique(CAProvincevec)
-  statesInMap <- c(statesInMap,CAProvincevec)
-  canada <- raster::getData("GADM",country="CAN",level=1)
-  mcrop <- rgeos::gSimplify(canada[canada$HASC_1 %in% paste0("CA.",CAProvincevec),],
-                            tol=0.1)
-  mcrop <- rgeos::gBuffer(sp::spTransform( mcrop, CRS( "+init=epsg:3857" ) ),
-                          width=max(mapbuffer,16000))
-  mcrop <- sp::spTransform( mcrop, CRS( "+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs" ) ) 
-  if (is.null(mapcrop)) {
-    mapcrop <- mcrop
-  } else {
-    mapcrop <- rgeos::gUnaryUnion(raster::union(mapcrop,mcrop))
-  } 
+  CAProvincevec <- unique(toupper(CAProvincevec))
+  for (i in 1:length(regionlist)) {
+    if (toupper(regionlist[[i]]) %in% CAProvincevec) {
+      CAProvincevec <- setdiff(CAProvincevec,toupper(regionlist[[i]]))
+      CAProvincevec <- union(CAProvincevec,toupper(regionstates[[i]]))
+    }
+  }
+  statesInMap <- union(statesInMap,CAProvincevec)
+  canada <- raster::getData("GADM",country="CAN",level=1) # raster + spatial
+  mcrop <- rgeos::gUnaryUnion(canada[canada$HASC_1 %in% paste0("CA.",CAProvincevec),])
+  # simplify - BC coast is extremely complex
+  mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop,simplifytol = 1)
 }
+if (!is.null(worldCountryvec)) {
+  worldCountryvec <- unique(toupper(worldCountryvec))
+  statesInMap <- union(statesInMap,CAProvincevec)
+  mcrop <- NULL
+  for (c in worldCountryvec) {
+    cmap <- raster::getData("GADM",country=worldCountryvec,level=0) # raster + spatial
+    cmap <- rgeos::gUnaryUnion(cmap)
+plot(cmap)
+    if (is.null(mcrop)) {
+      mcrop <- cmap
+    } else {
+      mcrop<- rgeos::gUnaryUnion(raster::union(mcrop,cmap))
+    }
+plot(mcrop)
+  }
+  mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop,simplifytol = 1)
+}
+mapcrop <- bufferUnion(mapcrop,mapbuffer=mapbuffer,NULL,simplifytol = 0)
 CP <- as(cropbox, "SpatialPolygons")
-proj4string(CP) <- CRS(proj4string(mapcrop))
-mapcrop <- gIntersection(mapcrop, CP, byid=TRUE)
+sp::proj4string(CP) <- CRS(sp::proj4string(mapcrop))
+mapcrop <- rgeos::gIntersection(mapcrop, CP, byid=TRUE)
 
 plot(mapcrop)
 
@@ -159,9 +207,14 @@ j <- 1
 r.list <- list()
 if (loadStateElevs) {
   for (st in statesInMap) {
-    load(paste0(datadir,"/",st,"elevs.rda"))
-    r.list[[j]] <- elevations
-    j <- j + 1
+    fvec <- list.files(path=paste0(datadir,"/rasterfiles"),
+                        pattern=paste0(st,"elevs[0-9]{,2}.grd"))
+    for (fn in fvec) {
+      print(paste0("loading ",fn))
+      elevations <- raster(paste0(datadir,"/rasterfiles/",fn))
+      r.list[[j]] <- elevations
+      j <- j + 1
+    }
   }
   if (j > 2) {
     m.sub <- do.call(merge, r.list)
@@ -180,30 +233,71 @@ if (loadStateElevs) {
   SLatMax <- ceiling(max(-mapextent@ymin,0))
 
   fn <- NULL
-  if (NLatMin < NLatMax) {
-    if (WLonMin < WLonMax) {
-      fn <- addmapfiles(fn,"w",WLonMin,WLonMax,"n",NLatMin,NLatMax)
+  if (NLatMax > 0) {
+    if (WLonMax > 0) {
+      fn <- addmapfiles(fn,"w",WLonMin,WLonMax,"n",NLatMin,NLatMax,resstr)
     }
-    if (ELonMin < ELonMax) {
-      fn <- addmapfiles(fn,"e",WLonMin,WLonMax,"n",NLatMin,NLatMax)
+    if (ELonMax > 0) {
+      fn <- addmapfiles(fn,"e",WLonMin,WLonMax,"n",NLatMin,NLatMax,resstr)
     }
   }
-  if (SLatMin < SLatMax) {
-    if (WLonMin < WLonMax) {
-      fn <- addmapfiles(fn,"w",WLonMin,WLonMax,"s",SLatMin,SLatMax)
+  if (SLatMax > 0) {
+    if (WLonMax > 0) {
+      fn <- addmapfiles(fn,"w",WLonMin,WLonMax,"s",SLatMin,SLatMax,resstr)
     }
-    if (ELonMin < ELonMax) {
-      fn <- addmapfiles(fn,"e",WLonMin,WLonMax,"s",SLatMin,SLatMax)
+    if (ELonMax > 0) {
+      fn <- addmapfiles(fn,"e",WLonMin,WLonMax,"s",SLatMin,SLatMax,resstr)
     }
   }
   tempd <- tempdir()
   rn <- gsub("_bil","",tools::file_path_sans_ext(fn))
   unfoundfn <- NULL
+  firstRes <- NULL
+  firstProj <- NULL
+  firstOrigin <- NULL
   for (i in 1:length(fn)) {
-    if (file.exists(paste0(NAmericaDataDir,"/",fn[[i]]))) {
-      print(paste0(NAmericaDataDir,"/",fn[[i]]))
-      unzip(paste0(NAmericaDataDir,"/",fn[[i]]),exdir=tempd)
+    if (file.exists(paste0(mapDataDir,"/",fn[[i]]))) {
+      cat("\n")
+      print(paste0(mapDataDir,"/",fn[[i]]))
+      unzip(paste0(mapDataDir,"/",fn[[i]]),exdir=tempd)
       tmp <- raster(paste0(tempd,"/",rn[[i]],".bil"))
+      if (is.null(firstOrigin)) {
+        print(tmp)
+        firstOrigin <- raster::origin(tmp)
+        print(firstOrigin)
+        firstXWide <- tmp@extent@xmax - tmp@extent@xmin
+        firstYWide <- tmp@extent@ymax - tmp@extent@ymin
+        firstRows <- nrow(tmp)
+        firstCols <- ncol(tmp)
+        firstProj <- raster::projection(tmp)
+        firstRes <- raster::res(tmp)
+      } else {
+        if (raster::projection(tmp)!=firstProj) 
+          warning("projection mismatch - ",raster::projection(tmp))
+      }
+      if (!identical(firstRes,raster::res(tmp))) {
+        print("resolution differs from the first tile - resampling")
+        print(raster::res(tmp))
+        ## what raster do we want? - clone first in dims, extent size and offset 
+        xwide <- tmp@extent@xmax - tmp@extent@xmin
+        ywide <- tmp@extent@ymax - tmp@extent@ymin
+        llx <- tmp@extent@xmin - (firstXWide-xwide)/2
+        lly <- tmp@extent@ymin - (firstYWide-ywide)/2
+        newraster <- tmp
+        raster::ncol(newraster) <- firstCols
+        raster::nrow(newraster) <- firstRows
+        newraster <- raster::setExtent(newraster,
+                          extent(llx,llx+firstXWide,
+                                 lly,lly+firstYWide))
+        #raster::res(newraster) <- firstRes
+        raster::origin(newraster) <- firstOrigin
+        print(tmp)  
+        tmp <- raster::resample(tmp, newraster)
+        print(tmp)
+      } else {
+        if (max(abs(firstOrigin-raster::origin(tmp))) > 0.0000001)  
+          warning("origin mismatch - ",raster::origin(tmp)," ",firstOrigin)
+      }
       xmin <- tmp@extent@xmin
       xmax <- tmp@extent@xmax
       ymin <- tmp@extent@ymin
@@ -216,9 +310,10 @@ if (loadStateElevs) {
         print("interior - not masked")
       } else if (gIntersects(mapcrop, ei)) {
         print(paste0("boundary - masking time = ",system.time(
-                 tmp <- raster::mask(raster::crop(tmp, extent(mapcrop)),
+                 tmp <- raster::mask(raster::crop(tmp, extent(mapcrop),snap="near"),
                                      mapcrop)
                           ))[[3]])
+        print(origin(tmp))
       } else {
         print("exterior - not used")
         tmp <- NULL
@@ -228,25 +323,53 @@ if (loadStateElevs) {
         j <- j + 1
       }
     } else {
-      print(paste0(NAmericaDataDir,"/",fn[[i]]," does not exist, ignored"))
+      print(paste0(mapDataDir,"/",fn[[i]]," does not exist, ignored"))
       unfoundfn <- c(unfoundfn,fn[[i]])
     }
   }
   print(warnings())
+  print("calling merge")
   if (j > 2) {
-    m.sub <- do.call(merge, r.list)
+    #m.sub <- do.call(merge, r.list))
+    m.sub <- do.call(merge, c(r.list,list(tolerance=0.1)))
   } else {
     m.sub <- r.list[[1]]
   }
 }
 if (lon0to360) m.sub <- raster::rotate(m.sub)
+elevations <- m.sub
 
 if (writeElevFile & (length(statesInMap)==1)) {
   #  for now only write when a single state/province/whatever specified
-  elevations <- raster::readAll(m.sub) 
-  save(elevations,file=paste0(datadir,"/",statesInMap[[1]],"elevs.rda"))
-} else {
-  elevations <- m.sub
+  #writeRaster(elevations,file=paste0(datadir,"/",statesInMap[[1]],"elevs.grd"),
+  #            overwrite=TRUE)
+  #save(elevations,file=paste0(datadir,"/",statesInMap[[1]],"elevs.rda"))
+  nchunks <- ceiling(raster::ncell(elevations)/maxrastercells)
+  if (nchunks == 1) {
+    writeRaster(elevations,file=paste0(datadir,"/rasterfiles/",
+                                       statesInMap[[1]],"elevs.grd"),
+                overwrite=TRUE)   
+  } else {
+    nrowchunk <- ceiling(raster::nrow(elevations)/nchunks)
+    for (chunk in 1:nchunks) {
+      chunkcrop <- raster::extent(raster::xmin(elevations),
+                                  raster::xmax(elevations),
+                                  raster::ymin(elevations) + 
+                                    raster::yres(elevations)*
+                                    ((chunk-1)*nrowchunk - 10),
+                                  raster::ymin(elevations) + 
+                                    raster::yres(elevations)*
+                                    (chunk*nrowchunk - 10)  )
+      chunkcrop <- as(chunkcrop, "SpatialPolygons")
+      sp::proj4string(chunkcrop) <- sp::proj4string(elevations)
+      chunkraster <- raster::trim(raster::crop(elevations,chunkcrop))
+      writeRaster(chunkraster,
+                  file=paste0(datadir,"/rasterfiles/",
+                              statesInMap[[1]],"elevs",
+                              stringr::str_pad(chunk,2,pad="0"),".grd"),
+                  overwrite=TRUE)    
+    }
+  }
 }
 
 print(paste0(elevations@ncols," columns by ",elevations@nrows," rows"))
@@ -275,7 +398,7 @@ if (drawRGL | drawPlotly) {
       plotly::add_surface(opacity=1.0) %>%
       plotly::layout(scene=list(xaxis=ax,yaxis=ay,zaxis=az,
                                 aspectmode = "manual",
-                                aspectratio = list(x=1,y=yscale,z=0.05),
+                                aspectratio = list(x=1,y=yscale,z=0.03*vertscale),
                                 camera=list(up=c(0,1,0),
                                             eye=c(0,1.25,0)) ) )
     p
@@ -303,9 +426,9 @@ if (drawRGL | drawPlotly) {
     rgl::rgl.clear()
     rgl::surface3d(x,y,mmmelev,color=col)
     rgl::material3d(alpha=1.0,point_antialias=TRUE,smooth=TRUE,shininess=0)
-    rgl::aspect3d(x=1,y=1/yscale,z=0.04)
+    rgl::aspect3d(x=1,y=1/yscale,z=0.035*vertscale)
     rgl::rgl.clear("lights")
-    rgl::rgl.light(theta = 0, phi = 25,
+    rgl::rgl.light(theta = 0, phi = 15,
                    viewpoint.rel=TRUE, specular="black")
     rgl::rgl.viewpoint(userMatrix=userMatrix,type="modelviewpoint")
     pan3d(2)  # right button for panning, doesn't play well with zoom)
