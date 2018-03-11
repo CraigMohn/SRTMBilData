@@ -9,17 +9,19 @@ library(rgeos)
 library(tigris)
 library(sf)
 
-USStatevec <-  "NM" #c("MountainWest","CA")
-USParkvec <- NULL # <- c("MORA") 
+mapLibSelector <- 1
+mapWindow <- NULL # <- c(-122.64,-121.67,45.95,46.70) # NULL
+USStatevec <- NULL # <- c("MountainWest","CA","NM","AZ")
+USParkvec <- c("CRLA") 
 CAProvincevec <- NULL #<- c("BC","AB","SK")
-worldCountryvec <- NULL #<- "AUS" #NULL # <- c("ESP","PRT","FRA") # http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html
-mapbuffer <- 5000     # meters, expands overall area
+worldCountryvec <- NULL # <- "AUS" #NULL # <- c("ESP","PRT","FRA") # http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html
+mapbuffer <- 3000     # meters, expands overall area
 mapmergebuffer <- 20  # meters, expands categories before merging with others
-#  southern slice of BC
-cropbox <- raster::extent(-180, 170, 0, 52.1)
-res3dplot <- 3300
+#  southern slice of BC,AB,SK 
+cropbox <- raster::extent(-180, 170, -50, 52.1)
+res3dplot <- 5000
 loadStateElevs <-  FALSE
-writeElevFile <- TRUE
+writeElevFile <- FALSE
 forceRes <- NULL
 maxrastercells <- 500000000
 highelevation <- 3000
@@ -35,8 +37,8 @@ mapoutputdir <- "c:/bda/maps3d"        #  map file output location
 NAmericaDataDir <- "c:/bda/NorthAmerica"   #  zip file input subdirectories location
 EuropeDataDir <- "c:/bda/Europe 3s"        #  zip file input subdirectories location
 AustraliaDataDir <- "c:/bda/Australia 3s"        #  zip file input subdirectories location
-mapDataDir <- c(NAmericaDataDir,EuropeDataDir,AustraliaDataDir)[[1]]
-resstr <- c("_1arc_v3_bil","_3arc_v2_bil","_3arc_v2_bil")[[1]]
+mapDataDir <- c(NAmericaDataDir,EuropeDataDir,AustraliaDataDir)[[mapLibSelector]]
+resstr <- c("_1arc_v3_bil","_3arc_v2_bil","_3arc_v2_bil")[[mapLibSelector]]
 
 
 #################################################################################
@@ -137,6 +139,12 @@ outputName <- paste0(c(USStatevec,CAProvincevec,USParkvec),collapse="-")
 ####    set up crop shape file
 mapcrop <- NULL
 statesInMap <- NULL
+if (!is.null(mapWindow)) {
+  mapcrop <- raster::extent(mapWindow)
+  CP <- as(mapcrop, "SpatialPolygons")
+  sp::proj4string(CP) <- "+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs"
+  mapcrop <- rgeos::gUnaryUnion(CP)
+}
 if (!is.null(USStatevec)) {
   USStatevec <- toupper(USStatevec)  # US State abbrev all upper case
   for (i in 1:length(regionlist)) {
@@ -155,7 +163,7 @@ if (!is.null(USParkvec)) {
   pdir <- "nps_boundary"
   pfile <- paste0(pdir,".shp")
   parkareas <- sf::st_read(paste0(datadir,"/",pdir,"/",pfile))  # sf dataframe
-  parkareas <- rgeos::gUnaryUnion(parkareas)
+  #parkareas <- rgeos::gUnaryUnion(parkareas)
   #  parknames <- parkareas[,c("UNIT_NAME","UNIT_CODE")]
   #  sf::st_geometry(parknames) <- NULL
   #  parknames <- parknames[order(parknames$UNIT_CODE),]
@@ -181,18 +189,16 @@ if (!is.null(CAProvincevec)) {
 }
 if (!is.null(worldCountryvec)) {
   worldCountryvec <- unique(toupper(worldCountryvec))
-  statesInMap <- union(statesInMap,CAProvincevec)
+  statesInMap <- union(statesInMap,worldCountryvec)
   mcrop <- NULL
   for (c in worldCountryvec) {
     cmap <- raster::getData("GADM",country=worldCountryvec,level=0) # raster + spatial
     cmap <- rgeos::gUnaryUnion(cmap)
-plot(cmap)
     if (is.null(mcrop)) {
       mcrop <- cmap
     } else {
       mcrop<- rgeos::gUnaryUnion(raster::union(mcrop,cmap))
     }
-plot(mcrop)
   }
   mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop,simplifytol = 1)
 }
@@ -238,7 +244,7 @@ if (loadStateElevs) {
       fn <- addmapfiles(fn,"w",WLonMin,WLonMax,"n",NLatMin,NLatMax,resstr)
     }
     if (ELonMax > 0) {
-      fn <- addmapfiles(fn,"e",WLonMin,WLonMax,"n",NLatMin,NLatMax,resstr)
+      fn <- addmapfiles(fn,"e",ELonMin,ELonMax,"n",NLatMin,NLatMax,resstr)
     }
   }
   if (SLatMax > 0) {
@@ -246,7 +252,7 @@ if (loadStateElevs) {
       fn <- addmapfiles(fn,"w",WLonMin,WLonMax,"s",SLatMin,SLatMax,resstr)
     }
     if (ELonMax > 0) {
-      fn <- addmapfiles(fn,"e",WLonMin,WLonMax,"s",SLatMin,SLatMax,resstr)
+      fn <- addmapfiles(fn,"e",ELonMin,ELonMax,"s",SLatMin,SLatMax,resstr)
     }
   }
   tempd <- tempdir()
