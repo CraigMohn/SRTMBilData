@@ -10,7 +10,7 @@ expandRegions <- function(invec,country) {
                        c("WA","OR","ID","MT","WY","CO","UT","NV"),
                        c("DE","MD","DC","VA"),
                        c("ME","NH","VT","MA","RI","CT"),
-                       c("NS","PE","NB","NL")
+                       c("NS","PE","NB","NF")
   )
   regioncountry <- c("US","US","US","US","CANADA")
   

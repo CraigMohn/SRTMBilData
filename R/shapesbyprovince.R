@@ -14,13 +14,11 @@ canada <- raster::getData("GADM",country="CAN",level=1) # spatial dataframe
 ###   cities and towns spdf
 tmpt <- raster::shapefile(paste0(datadir,"/CanadaShapefiles/MetroAreas/",
                                  "lcma000b16a_e.shp"))
-#  select from CMATYPE B=Metro, K=agglomeration w/tracts, D=agglomeration w/o tracts
-tmpt <- tmpt[tmpt@data[,"CMATYPE"]=="B",]
 
 ###   highways sldf
 tmpr <- raster::shapefile(paste0(datadir,"/CanadaShapefiles/Roads/",
                                  "lrnf000r16a_e.shp"))
-#  keep based on RANK 1=transcanada, 2=national, 3=major, 4=secondary hwy
+#  too huge - keep based on RANK 1=transcanada, 2=national, 3=major, 4=secondary hwy
 tmpr <- tmpr[as.numeric(tmpr@data[,"RANK"])<=4,]
 #  and CLASS - 10-13 hwys, 20-22 roads down to "collector", 23-26 minor roads, 27 rapid transit,
 #              80 - bridge/tunnel 
@@ -31,14 +29,18 @@ tmpr <- rgeos::gLineMerge(tmpr,byid=TRUE,id=tmpr@data$NGDUID)
 tmpr <- sp::SpatialLinesDataFrame(tmpr,data=rdata)
 rdata <- NULL
 
+
 ### areal water spdf
 tmpa <- raster::shapefile(paste0(datadir,"/CanadaShapefiles/Lakes+RiversPolygons/",
                                  "lhy_000c16a_e.shp")) 
+colnames(tmpa@data) <- sub("NAME","FULLNAME",colnames(tmpa@data))
+
 ### linear water sldf
 tmpl <- raster::shapefile(paste0(datadir,"/CanadaShapefiles/RiversLines/",
                                  "lhy_000d16a_e.shp")) 
 ldata <- tmpl@data
 row.names(ldata) <- ldata$HYDROUID
+colnames(ldata) <- sub("NAME","FULLNAME",colnames(ldata))
 tmpl <- rgeos::gLineMerge(tmpl,byid=TRUE,id=tmpl@data$HYDROUID)
 tmpl <- sp::SpatialLinesDataFrame(tmpl,data=ldata)
 ldata <- NULL

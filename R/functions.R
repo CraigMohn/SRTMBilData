@@ -103,6 +103,7 @@ loadStateElevData <- function(USStatevec,CAProvincevec) {
     for (fn in fvec) {
       print(paste0("loading ",fn))
       elevations <- raster(paste0(datadir,"/rasterfiles/",fn))
+      print(elevations)
       r.list[[j]] <- elevations
       j <- j + 1
     }
@@ -250,30 +251,39 @@ loadMapElevData <- function(mapcrop) {
   }
   return(m.sub)
 }
-USFeatures <- function(USStatevec,showCities=TRUE,showRoads=TRUE,showWater=TRUE) {
+USFeatures <- function(USStatevec,workProj4,showCities=TRUE,showRoads=TRUE,showWater=TRUE) {
+  spTown <- NULL
   if (showCities) {
-    tmp <- sp::spTransform(tigris::urban_areas(),crs(mapcrop)) # SpatialPolygonsDF
-    spTown <- raster::intersect(tmp,mapcrop)  # SpatialPolygonsDF
+    spTown <- sp::spTransform(tigris::urban_areas(),workProj4) # SpatialPolygonsDF
+    spTown <- spTown[,(names(spTown) %in% c("NAME10","UATYP10"))]
+    colnames(spTown@data) <- c("NAME","TYPE") # type is   A pop >= 50k, 2.5k <= U pop < 50k
     if (!is.null(spTown)) plot(spTown, col="PeachPuff")
   }
+  spRoads <- NULL
   if (showRoads) {
-    spRoads <- NULL
     for (st in USStatevec) {
-      tmp <- sp::spTransform(tigris::primary_secondary_roads(st),
-                             crs(mapcrop))         # SpatialPolygonsDF
+      tmp <- sp::spTransform(tigris::primary_secondary_roads(st),workProj4) # SpatialPolygonsDF
+      tmp <- tmp[,(names(tmp) %in% c("FULLNAME","MTFCC"))]
+      colnames(tmp@data) <- c("NAME","TYPE")  
+      # type is   S1100=secondary   S1200=Primary
       spRoads <- rbind_NULLok(spRoads,tmp)
     }
     if (!is.null(spRoads)) plot(spRoads)
   }
+  spWaterA <- NULL
+  spWaterL <- NULL
   if (showWater) {
-    spWaterA <- NULL
-    spWaterL <- NULL
     for (st in USStatevec) {
       for (c in tigris::list_counties(st)[["county_code"]]) {
-        tmpA <- sp::spTransform(tigris::area_water(st,c),
-                                crs(mapcrop))          #spatialPolygon dataframe
-        tmpL <- sp::spTransform(tigris::linear_water(st,c),
-                                crs(mapcrop))          #spatialLines dataframe
+        tmpA <- sp::spTransform(tigris::area_water(st,c),workProj4) #spatialPolygon dataframe
+        tmpA <- tmpA[,(names(tmpA) %in% c("FULLNAME","MTFCC"))]
+        colnames(tmpA@data) <- c("NAME","TYPE")  
+        # type is   H2025=Swamp,H2030=Lake/Pond,H22040=Reservoir,H2041=TreatmentPond,
+        #           H2051=Bay/Est/Sound,H2053=Ocean,H2060=Pit/Quarry,H2081=Glacier
+        tmpL <- sp::spTransform(tigris::linear_water(st,c),workProj4) #spatialLines dataframe
+        tmpL <- tmpL[,(names(tmpL) %in% c("FULLNAME","MTFCC"))]
+        colnames(tmpL@data) <- c("NAME","TYPE")  
+        # type is   H3010=Stream/River,H3013=BraidedStream,H3020=Canal/Ditch
         spWaterA <- rbind_NULLok(spWaterA,tmpA)
         spWaterL <- rbind_NULLok(spWaterL,tmpL)
       }
@@ -284,29 +294,47 @@ USFeatures <- function(USStatevec,showCities=TRUE,showRoads=TRUE,showWater=TRUE)
   }
   return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
 }
-CAFeatures <- function(CAProvincevec,showCities=TRUE,showRoads=TRUE,showWater=TRUE) {
+CAFeatures <- function(CAProvincevec,workProj4,showCities=TRUE,showRoads=TRUE,showWater=TRUE) {
   spTown <- NULL
   spRoads <- NULL
   spWaterA <- NULL
   spWaterL <- NULL
   ##  files are already filtered for city/road/polygonwater importance
   for (pr in CAProvincevec) {
+    print(paste0("loading features for ",pr))
     if (showCities) {
       tmp <- raster::shapefile(paste0(datadir,"/shapefiles/",pr,
                                       "Town.shp")) # SpatialPolygonsDF
+      tmp <- sp::spTransform(tmp,workProj4)
+      tmp <- tmp[,(names(tmp) %in% c("CMANAME","CMATYPE"))]
+      colnames(tmp@data) <- c("NAME","TYPE")
+      # type is   B=Metro, K=agglomeration w/tracts, D=agglomeration w/o tracts
+      tmp <- tmp[tmp@data[,"TYPE"]!="K",]
       spTown <- rbind_NULLok(spTown,tmp)
      }
     if (showRoads) {
       tmp <- raster::shapefile(paste0(datadir,"/shapefiles/",pr,
                                       "Roads.shp")) # SpatialLinesDF
+      tmp <- sp::spTransform(tmp,workProj4)
+      tmp <- tmp[,(names(tmp) %in% c("NAME","RANK"))]
+      colnames(tmp@data) <- c("NAME","TYPE")  
       spRoads <- rbind_NULLok(spRoads,tmp)
     }
     if (showWater) {
       tmp <- raster::shapefile(paste0(datadir,"/shapefiles/",pr,
                                       "WaterA")) # SpatialPolygonsDF
+      tmp <- sp::spTransform(tmp,workProj4)
+      tmp <- tmp[,(names(tmp) %in% c("FULLNAME"))]
+      colnames(tmp@data) <- c("NAME")
+      tmp@data$TYPE <- ""
+      # type is not broken down
       spWaterA <- rbind_NULLok(spWaterA,tmp)
       tmp <- raster::shapefile(paste0(datadir,"/shapefiles/",pr,
                                       "WaterL")) # SpatialLinesDF
+      tmp <- sp::spTransform(tmp,workProj4)
+      tmp <- tmp[,(names(tmp) %in% c("FULLNAME"))]
+      colnames(tmp@data) <- c("NAME")
+      tmp@data$TYPE <- ""
       spWaterL <- rbind_NULLok(spWaterL,tmp)
     }
   }
@@ -331,7 +359,7 @@ filterWaterL <- function(waterLineDF,level="area") {
   } else if (level=="all") {
     return(waterLineDF)
   } else {
-    tmpname <- waterLineDF@data[,"NAME"]
+    tmpname <- waterLineDF@data[,"FULLNAME"]
     if (level == "rivers") {
       tmpkeep <- grepl("Riv",tmpname)
     } else if (level == "riversplus") {
