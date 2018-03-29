@@ -107,12 +107,10 @@ loadStateElevData <- function(USStatevec,CAProvincevec) {
       r.list[[j]] <- elevations
       j <- j + 1
     }
-    if (st %in% USStatevec) {
-      shapedir <- paste0(datadir,"/shapefiles/")
-    } else {
-      shapedir <- paste0(datadir,"/shapefiles/")
-    }
+    shapedir <- paste0(datadir,"/shapefiles/")
     tRoads <- raster::shapefile(paste0(shapedir,st,"Roads.shp"))
+print(tRoads)
+print(spRoads)  
     spRoads <- rbind_NULLok(spRoads,tRoads)
     tWaterA <- raster::shapefile(paste0(shapedir,st,"WaterA.shp"))
     spWaterA <- rbind_NULLok(spWaterA,tWaterA)
@@ -288,7 +286,7 @@ USFeatures <- function(USStatevec,workProj4,showCities=TRUE,showRoads=TRUE,showW
         spWaterL <- rbind_NULLok(spWaterL,tmpL)
       }
     }
-    spWaterL <- spWaterL[spWaterL@data[,"MTFCC"]=="H3010",]  # keep only rivers and streams H3010
+    spWaterL <- spWaterL[spWaterL@data[,"TYPE"]=="H3010",]  # keep only rivers and streams H3010
     if (!is.null(spWaterA)) plot(spWaterA)
     if (!is.null(spWaterL)) plot(spWaterL)
   }
@@ -347,7 +345,7 @@ CAFeatures <- function(CAProvincevec,workProj4,showCities=TRUE,showRoads=TRUE,sh
 
 filterWaterA <- function(waterLineDF,level="named") {
   if (level == "named") {
-    tmpkeep <- !is.na(waterLineDF@data[,"FULLNAME"])
+    tmpkeep <- !is.na(waterLineDF@data[,"NAME"])
     return(waterLineDF[tmpkeep,])
   } else {
     return(waterLineDF)
@@ -359,7 +357,7 @@ filterWaterL <- function(waterLineDF,level="area") {
   } else if (level=="all") {
     return(waterLineDF)
   } else {
-    tmpname <- waterLineDF@data[,"FULLNAME"]
+    tmpname <- waterLineDF@data[,"NAME"]
     if (level == "rivers") {
       tmpkeep <- grepl("Riv",tmpname)
     } else if (level == "riversplus") {

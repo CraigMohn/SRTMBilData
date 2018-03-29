@@ -12,23 +12,24 @@ library(sf)
 source("C:/bda/SRTMBilData/R/functions.R")
 source("C:/bda/SRTMBilData/R/regionDefs.R")
 mapLibSelector <- 1  # 1=northAmerica+NE Pacific 1s, 2=Europe 3s, 3=Australia 3s
-mapWindow <- NULL
-USStatevec <-"ME" #c("MountainWest","CA","NM","AZ")
+mapWindow <- NULL 
+USStatevec <- "NV" # c("WA","OR") # c("MountainWest","CA","NM","AZ")
 USParkvec <- NULL # <- c("CANY","CEBR","BRCA","ARCH") 
-CAProvincevec <- c("Maritimes","QC") #c("BC","AB","SK")
+CAProvincevec <- NULL # "AB" #c("Maritimes","QC") #c("BC","AB","SK")
 worldCountryvec <- NULL # <- c("DEU","AUT","CZE","CHE","FRA") #NULL # <- c("ESP","PRT","FRA") # http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html
 showWater <- TRUE
-waterLevel <- "rivers"  # "named","area","rivers","all"
+waterLevel <- "area"  # "named","area","rivers","all"
 showRoads <- TRUE
 showCities <- TRUE
 
-mapbuffer <- 0 #1000 #5000     # meters, expands overall area
+mapbuffer <- 1000 #5000     # meters, expands overall area
 mapmergebuffer <- 200  # meters, expands categories before merging with others
 
-cropbox <- raster::extent(-180, 170, -50, 52.1) #  southern slice of BC,AB,SK 
-res3dplot <- 4500
+cropbox <- raster::extent(-180, 170, -50, 60)  
+#cropbox <- raster::extent(-180, 170, -50, 52.1) #  southern slice of BC,AB,SK 
+res3dplot <- 3200
 loadStateElevs <-  FALSE
-writeElevFile <- FALSE
+writeElevFile <- TRUE
 forceRes <- NULL
 maxrastercells <- 500000000
 highelevation <- 3000
@@ -47,7 +48,7 @@ NAmericaDataDir <- "c:/bda/NorthAmerica"   #  zip file input subdirectories loca
 EuropeDataDir <- "c:/bda/Europe 3s"        #  zip file input subdirectories location
 AustraliaDataDir <- "c:/bda/Australia 3s"        #  zip file input subdirectories location
 mapDataDir <- c(NAmericaDataDir,EuropeDataDir,AustraliaDataDir)[[mapLibSelector]]
-resstr <- c("_1arc_v3_bil","_3arc_v2_bil","_3arc_v2_bil")[[mapLibSelector]]
+resstr <- c("_1arc_v3_bil","_3arc_v2_bil","_1arc_v3_bil")[[mapLibSelector]]
 
 #################################################################################
 assign("last.warning", NULL, envir = baseenv())
@@ -67,7 +68,7 @@ if (!is.null(mapWindow)) {
 if (!is.null(USStatevec)) {
   USStatevec <- expandRegions(unique(toupper(USStatevec)),"US")  # US State abbrev all upper case
   statesInMap <- union(statesInMap,USStatevec)  
-  mcrop <- rgeos::gUnaryUnion(sp::spTransform(tigris::counties(statesInMap),workProj4)) 
+  mcrop <- rgeos::gUnaryUnion(sp::spTransform(tigris::counties(statesInMap),sp::CRS(workProj4))) 
   ## tigris returns a SpatialPolgonsDF and 
   ##    gUnaryUnion returns a SpatialPolygons
   mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop)
@@ -84,7 +85,7 @@ if (!is.null(USParkvec)) {
   #  parknames <- parknames[order(parknames$UNIT_CODE),] 
   #  write.csv(parknames,paste0(datadir,"/parknames.csv"))
   parkareas <-  sp::spTransform(parkareas[parkareas$UNIT_CODE %in% USParkvec,"geometry"],
-                                workProj4) 
+                                sp::CRS(workProj4)) 
   mcrop <- as(parkareas, "Spatial")  
   mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop)
 }
@@ -92,7 +93,7 @@ if (!is.null(CAProvincevec)) {
   CAProvincevec <- expandRegions(unique(toupper(CAProvincevec)),"CANADA")
   statesInMap <- union(statesInMap,CAProvincevec)
   canada <- raster::getData("GADM",country="CAN",level=1) # raster + spatial
-  canada <-  sp::spTransform(canada,workProj4)
+  canada <-  sp::spTransform(canada,sp::CRS(workProj4))
   mcrop <- rgeos::gUnaryUnion(canada[canada$HASC_1 %in% paste0("CA.",CAProvincevec),])
   # simplify - BC coast is extremely complex
   mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop,simplifytol = 1) 
@@ -104,7 +105,7 @@ if (!is.null(worldCountryvec)) {
   for (c in worldCountryvec) {
     cmap <- raster::getData("GADM",country=worldCountryvec,level=0) # raster + spatial
     cmap <- rgeos::gUnaryUnion(cmap) 
-    cmap <-  sp::spTransform(cmap,workProj4)
+    cmap <-  sp::spTransform(cmap,sp::CRS(workProj4))
     if (is.null(mcrop)) {
       mcrop <- cmap
     } else {
@@ -117,7 +118,7 @@ mapcrop <- bufferUnion(mapcrop,mapbuffer=mapbuffer,NULL,simplifytol = 0)
 CP <- as(cropbox, "SpatialPolygons")
 sp::proj4string(CP) <- CRS(sp::proj4string(mapcrop))
 mapcrop <- rgeos::gIntersection(mapcrop, CP, byid=TRUE)
-plot(mapcrop)
+plot(mapcrop)  #  which has CRS = workProj4
 
 ####################################################################################
 if (loadStateElevs) {
@@ -125,13 +126,15 @@ if (loadStateElevs) {
   tmp <- loadStateElevData(USStatevec,CAProvincevec)  
   mapcrop <- raster::extent(cropbox)
   CP <- as(mapcrop, "SpatialPolygons")
-  sp::proj4string(CP) <- work4Proj
+  sp::proj4string(CP) <- workProj4
   mapcrop <- rgeos::gUnaryUnion(CP)
-  spTown <- sp::spTransform(tmp[["spTown"]],workProj4)
-  spRoads <- sp::spTransform(tmp[["spRoads"]],workProj4)
-  spWaterA <- sp::spTransform(tmp[["spWaterA"]],workProj4)
-  spWaterL <- sp::spTransform(tmp[["spWaterL"]],workProj4)
-  m.sub <-  sp::spTransform(tmp[["elevraster"]],workProj4)
+  spTown <- sp::spTransform(tmp[["spTown"]],sp::CRS(workProj4))
+  spRoads <- sp::spTransform(tmp[["spRoads"]],sp::CRS(workProj4))
+  spWaterA <- sp::spTransform(tmp[["spWaterA"]],sp::CRS(workProj4))
+  spWaterL <- sp::spTransform(tmp[["spWaterL"]],sp::CRS(workProj4))
+  m.sub <- tmp[["elevraster"]]
+  if (!raster::compareCRS(raster::crs(m.sub),sp::CRS(workProj4)))
+    m.sub <- raster::projectRaster(m.sub,crs=workProj4)
   
 } else {
   spTown <- NULL
@@ -158,7 +161,9 @@ if (loadStateElevs) {
     spWaterA <- rbind_NULLok(spWaterA,tmp[["spWaterA"]])
     spWaterL <- rbind_NULLok(spWaterL,tmp[["spWaterL"]])
   }
-  m.sub <- sp::spTransform(loadMapElevData(mapcrop),workProj4)
+  m.sub <- loadMapElevData(mapcrop)
+  if (!raster::compareCRS(raster::crs(m.sub),sp::CRS(workProj4)))
+    m.sub <- raster::projectRaster(m.sub,crs=workProj4)
 }
 
 if (lon0to360) m.sub <- raster::rotate(m.sub)
