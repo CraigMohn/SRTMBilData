@@ -13,12 +13,12 @@ source("C:/bda/SRTMBilData/R/functions.R")
 source("C:/bda/SRTMBilData/R/regionDefs.R")
 mapLibSelector <- 1  # 1=northAmerica+NE Pacific 1s, 2=Europe 3s, 3=Australia 3s
 mapWindow <- NULL 
-USStatevec <- "NV" # c("WA","OR") # c("MountainWest","CA","NM","AZ")
+USStatevec <- "CO" # c("WA","OR") # c("MountainWest","CA","NM","AZ")
 USParkvec <- NULL # <- c("CANY","CEBR","BRCA","ARCH") 
 CAProvincevec <- NULL # "AB" #c("Maritimes","QC") #c("BC","AB","SK")
 worldCountryvec <- NULL # <- c("DEU","AUT","CZE","CHE","FRA") #NULL # <- c("ESP","PRT","FRA") # http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html
 showWater <- TRUE
-waterLevel <- "area"  # "named","area","rivers","all"
+waterLevel <- "named"  # "named","area","rivers","all"
 showRoads <- TRUE
 showCities <- TRUE
 
@@ -26,8 +26,9 @@ mapbuffer <- 1000 #5000     # meters, expands overall area
 mapmergebuffer <- 200  # meters, expands categories before merging with others
 
 cropbox <- raster::extent(-180, 170, -50, 60)  
+#cropbox <- raster::extent(-160.25, -154.8, -18.9, 22.25) # hawaii main islands only
 #cropbox <- raster::extent(-180, 170, -50, 52.1) #  southern slice of BC,AB,SK 
-res3dplot <- 3200
+res3dplot <- 3400
 loadStateElevs <-  FALSE
 writeElevFile <- TRUE
 forceRes <- NULL
@@ -36,11 +37,12 @@ highelevation <- 3000
 vertscale <- 1.3
 rglNAcolor <- "Blue"
 drawRGL <- TRUE
-saveRGL <- FALSE
+saveRGL <- TRUE
 drawPlotly <- FALSE
 savePlotly <- FALSE
 lon0to360=FALSE
 workProj4 <- "+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs"
+options(tigris_use_cache = TRUE)
 
 datadir <- "c:/bda"                    #  base dir - subs include shapefiles, rasterfile 
 mapoutputdir <- "c:/bda/maps3d"        #  map file output location
@@ -135,7 +137,6 @@ if (loadStateElevs) {
   m.sub <- tmp[["elevraster"]]
   if (!raster::compareCRS(raster::crs(m.sub),sp::CRS(workProj4)))
     m.sub <- raster::projectRaster(m.sub,crs=workProj4)
-  
 } else {
   spTown <- NULL
   spRoads <- NULL
@@ -166,14 +167,13 @@ if (loadStateElevs) {
     m.sub <- raster::projectRaster(m.sub,crs=workProj4)
 }
 
-if (lon0to360) m.sub <- raster::rotate(m.sub)
-elevations <- m.sub
 
 ##  okay, elevs and shapefiles are set up
 
 ##################################################################################
 if (writeElevFile & (length(statesInMap)==1)) {
   nchunks <- ceiling(raster::ncell(elevations)/maxrastercells)
+  print(paste0("saving raster data in ",nchunks," slices"))
   if (nchunks == 1) {
     writeRaster(elevations,file=paste0(datadir,"/rasterfiles/",
                                        statesInMap[[1]],"elevs.grd"),
@@ -199,21 +199,26 @@ if (writeElevFile & (length(statesInMap)==1)) {
                   overwrite=TRUE)    
     }
   }
-  raster::shapefile(spRoads,filename=paste0(datadir,"/shapefiles/",
-                                            statesInMap[[1]],"Roads.shp"),
-                    overwrite=TRUE)
-  raster::shapefile(spWaterA,filename=paste0(datadir,"/shapefiles/",
-                                             statesInMap[[1]],"WaterA.shp"),
-                    overwrite=TRUE)
-  raster::shapefile(spWaterL,filename=paste0(datadir,"/shapefiles/",
-                                             statesInMap[[1]],"WaterL.shp"),
-                    overwrite=TRUE)
-  raster::shapefile(spTown,filename=paste0(datadir,"/shapefiles/",
-                                             statesInMap[[1]],"Town.shp"),
-                    overwrite=TRUE)
+  if (USStatevec[[1]]==statesInMap[[1]]) {
+    raster::shapefile(spRoads,filename=paste0(datadir,"/shapefiles/",
+                                              statesInMap[[1]],"Roads.shp"),
+                      overwrite=TRUE)
+    raster::shapefile(spWaterA,filename=paste0(datadir,"/shapefiles/",
+                                               statesInMap[[1]],"WaterA.shp"),
+                      overwrite=TRUE)
+    raster::shapefile(spWaterL,filename=paste0(datadir,"/shapefiles/",
+                                               statesInMap[[1]],"WaterL.shp"),
+                      overwrite=TRUE)
+    raster::shapefile(spTown,filename=paste0(datadir,"/shapefiles/",
+                                               statesInMap[[1]],"Town.shp"),
+                      overwrite=TRUE)
+  }
 }
 #############################################################################
-
+# crop raster after write
+m.sub <- raster::crop(m.sub,mapcrop)
+if (lon0to360) m.sub <- raster::rotate(m.sub)
+elevations <- m.sub
 
 print(paste0(elevations@ncols," columns by ",elevations@nrows," rows"))
 sfact <- max(1,floor(max(elevations@ncols,elevations@nrows)/res3dplot))

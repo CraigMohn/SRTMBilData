@@ -109,8 +109,6 @@ loadStateElevData <- function(USStatevec,CAProvincevec) {
     }
     shapedir <- paste0(datadir,"/shapefiles/")
     tRoads <- raster::shapefile(paste0(shapedir,st,"Roads.shp"))
-print(tRoads)
-print(spRoads)  
     spRoads <- rbind_NULLok(spRoads,tRoads)
     tWaterA <- raster::shapefile(paste0(shapedir,st,"WaterA.shp"))
     spWaterA <- rbind_NULLok(spWaterA,tWaterA)
