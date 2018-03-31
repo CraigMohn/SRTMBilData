@@ -13,7 +13,7 @@ source("C:/bda/SRTMBilData/R/functions.R")
 source("C:/bda/SRTMBilData/R/regionDefs.R")
 mapLibSelector <- 1  # 1=northAmerica+NE Pacific 1s, 2=Europe 3s, 3=Australia 3s
 mapWindow <- NULL 
-USStatevec <- "CO" # c("WA","OR") # c("MountainWest","CA","NM","AZ")
+USStatevec <- "UT" # c("WA","OR") # c("MountainWest","CA","NM","AZ")
 USParkvec <- NULL # <- c("CANY","CEBR","BRCA","ARCH") 
 CAProvincevec <- NULL # "AB" #c("Maritimes","QC") #c("BC","AB","SK")
 worldCountryvec <- NULL # <- c("DEU","AUT","CZE","CHE","FRA") #NULL # <- c("ESP","PRT","FRA") # http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html
@@ -117,9 +117,13 @@ if (!is.null(worldCountryvec)) {
   mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop,simplifytol = 1)
 }
 mapcrop <- bufferUnion(mapcrop,mapbuffer=mapbuffer,NULL,simplifytol = 0)
-CP <- as(cropbox, "SpatialPolygons")
-sp::proj4string(CP) <- CRS(sp::proj4string(mapcrop))
-mapcrop <- rgeos::gIntersection(mapcrop, CP, byid=TRUE)
+
+#   now crop by the cropbox unless saving
+if (!writeElevFile) {
+  CP <- as(cropbox, "SpatialPolygons")
+  sp::proj4string(CP) <- CRS(sp::proj4string(mapcrop))
+  mapcrop <- rgeos::gIntersection(mapcrop, CP, byid=TRUE)
+}
 plot(mapcrop)  #  which has CRS = workProj4
 
 ####################################################################################
@@ -166,6 +170,8 @@ if (loadStateElevs) {
   if (!raster::compareCRS(raster::crs(m.sub),sp::CRS(workProj4)))
     m.sub <- raster::projectRaster(m.sub,crs=workProj4)
 }
+spTown <- gIntersection(spTown,mapcrop)
+elevations <- m.sub
 
 
 ##  okay, elevs and shapefiles are set up
@@ -216,9 +222,8 @@ if (writeElevFile & (length(statesInMap)==1)) {
 }
 #############################################################################
 # crop raster after write
-m.sub <- raster::crop(m.sub,mapcrop)
-if (lon0to360) m.sub <- raster::rotate(m.sub)
-elevations <- m.sub
+elevations <- raster::crop(elevations,mapcrop)
+if (lon0to360) elevations <- raster::rotate(elevations)
 
 print(paste0(elevations@ncols," columns by ",elevations@nrows," rows"))
 sfact <- max(1,floor(max(elevations@ncols,elevations@nrows)/res3dplot))
