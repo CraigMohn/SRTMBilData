@@ -3,6 +3,7 @@ library(rgeos)
 library(sp)
 
 datadir <- "c:/bda"                    #  base dir - subs include shapefiles, rasterfile 
+workProj4 <- "+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs"
 
 #  download data from census canada, unzip into datadir/CanadaShapefiles/
 #     creates shapefiles for province roads, cities, water in directory datadir/shapefiles
@@ -10,10 +11,14 @@ datadir <- "c:/bda"                    #  base dir - subs include shapefiles, ra
 ########################### can skip to load if restarting from saved results
 
 canada <- raster::getData("GADM",country="CAN",level=1) # spatial dataframe
+canada <- sp::spTransform(canada,workProj4)
 
 ###   cities and towns spdf
 tmpt <- raster::shapefile(paste0(datadir,"/CanadaShapefiles/MetroAreas/",
                                  "lcma000b16a_e.shp"))
+tmpt <- sp::spTransform(tmpt,workProj4)
+# type is   B=Metro, K=agglomeration w/tracts, D=agglomeration w/o tracts
+tmpt <- tmpt[tmpt@data[,"CMATYPE"]!="K",]
 
 ###   highways sldf
 tmpr <- raster::shapefile(paste0(datadir,"/CanadaShapefiles/Roads/",
@@ -27,28 +32,25 @@ rdata <- tmpr@data
 row.names(rdata) <- rdata$NGDUID
 tmpr <- rgeos::gLineMerge(tmpr,byid=TRUE,id=tmpr@data$NGDUID)
 tmpr <- sp::SpatialLinesDataFrame(tmpr,data=rdata)
-rdata <- NULL
-
 
 ### areal water spdf
 tmpa <- raster::shapefile(paste0(datadir,"/CanadaShapefiles/Lakes+RiversPolygons/",
                                  "lhy_000c16a_e.shp")) 
-colnames(tmpa@data) <- sub("NAME","FULLNAME",colnames(tmpa@data))
+colnames(tmpa@data) <- sub("FULLNAME","NAME",colnames(tmpa@data))
 
 ### linear water sldf
 tmpl <- raster::shapefile(paste0(datadir,"/CanadaShapefiles/RiversLines/",
                                  "lhy_000d16a_e.shp")) 
 ldata <- tmpl@data
 row.names(ldata) <- ldata$HYDROUID
-colnames(ldata) <- sub("NAME","FULLNAME",colnames(ldata))
+colnames(ldata) <- sub("FULLNAME","NAME",colnames(ldata))
 tmpl <- rgeos::gLineMerge(tmpl,byid=TRUE,id=tmpl@data$HYDROUID)
 tmpl <- sp::SpatialLinesDataFrame(tmpl,data=ldata)
-ldata <- NULL
 
-tmpt <- sp::spTransform(tmpt,crs(canada)) 
-tmpr <- sp::spTransform(tmpr,crs(canada)) 
-tmpa <- sp::spTransform(tmpa,crs(canada)) 
-tmpl <- sp::spTransform(tmpl,crs(canada)) 
+tmpt <- sp::spTransform(tmpt,workProj4) 
+tmpr <- sp::spTransform(tmpr,workProj4) 
+tmpa <- sp::spTransform(tmpa,workProj4) 
+tmpl <- sp::spTransform(tmpl,workProj4) 
 
 save(list = ls(all.names = TRUE), 
      file = paste0(datadir,"/CanadaShapefiles/shapesb4masking.RData"), 
@@ -67,28 +69,32 @@ for (i in 1:length(provlist)) {
   
   print("starting towns")
   keep <- tmpt@data$PRUID == prid 
-  tmpmasked <- tmpt[keep,]
+  tmpmasked <- tmpt[keep,(names(tmpt) %in% c("CMANAME","CMATYPE"))]
+  colnames(tmpmasked@data) <- c("NAME","TYPE")
   plot(tmpmasked, col="PeachPuff")
   raster::shapefile(tmpmasked,filename=paste0(datadir,"/shapefiles/",
                                               pr,"Town.shp"),
                     overwrite=TRUE)
   print("starting roads")
   keep <- tmpr@data$PRUID_L == prid | tmpr@data$PRUID_L == prid
-  tmpmasked <- tmpr[keep,]
+  tmpmasked <- tmpr[keep,(names(tmpr) %in% c("NAME","RANK"))]
+  colnames(tmpmasked@data) <- c("NAME","TYPE")  
   plot(tmpmasked)
   raster::shapefile(tmpmasked,filename=paste0(datadir,"/shapefiles/",
                                               pr,"Roads.shp"),
                     overwrite=TRUE)
   print("starting water area")
   keep <- tmpa@data$PRUID == prid 
-  tmpmasked <- tmpa[keep,]
+  tmpmasked <- tmpa[keep,"NAME"]
+  tmpmasked@data$TYPE <- ""
   plot(tmpmasked)
   raster::shapefile(tmpmasked,filename=paste0(datadir,"/shapefiles/",
                                               pr,"WaterA.shp"),
                     overwrite=TRUE)
   print("starting water lines")
   keep <- tmpl@data$PRUID == prid 
-  tmpmasked <- tmpl[keep,]
+  tmpmasked <- tmpl[keep,"NAME"]
+  tmpmasked@data$TYPE <- ""
   plot(tmpmasked)
   raster::shapefile(tmpmasked,filename=paste0(datadir,"/shapefiles/",
                                               pr,"WaterL.shp"),

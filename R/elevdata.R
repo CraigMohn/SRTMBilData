@@ -13,12 +13,12 @@ source("C:/bda/SRTMBilData/R/functions.R")
 source("C:/bda/SRTMBilData/R/regionDefs.R")
 mapLibSelector <- 1  # 1=northAmerica+NE Pacific 1s, 2=Europe 3s, 3=Australia 3s
 mapWindow <- NULL 
-USStatevec <- "UT" # c("WA","OR") # c("MountainWest","CA","NM","AZ")
+USStatevec <- c("MountainWest","CA","NM","AZ")
 USParkvec <- NULL # <- c("CANY","CEBR","BRCA","ARCH") 
-CAProvincevec <- NULL # "AB" #c("Maritimes","QC") #c("BC","AB","SK")
+CAProvincevec <- c("BC","AB","SK")
 worldCountryvec <- NULL # <- c("DEU","AUT","CZE","CHE","FRA") #NULL # <- c("ESP","PRT","FRA") # http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html
 showWater <- TRUE
-waterLevel <- "named"  # "named","area","rivers","all"
+waterLevel <- "area"  # "named","area","rivers","all"
 showRoads <- TRUE
 showCities <- TRUE
 
@@ -28,16 +28,16 @@ mapmergebuffer <- 200  # meters, expands categories before merging with others
 cropbox <- raster::extent(-180, 170, -50, 60)  
 #cropbox <- raster::extent(-160.25, -154.8, -18.9, 22.25) # hawaii main islands only
 #cropbox <- raster::extent(-180, 170, -50, 52.1) #  southern slice of BC,AB,SK 
-res3dplot <- 3400
-loadStateElevs <-  FALSE
-writeElevFile <- TRUE
+res3dplot <- 6000
+loadStateElevs <-  TRUE
+writeElevFile <- FALSE
 forceRes <- NULL
 maxrastercells <- 500000000
 highelevation <- 3000
-vertscale <- 1.3
+vertscale <- 1.0
 rglNAcolor <- "Blue"
 drawRGL <- TRUE
-saveRGL <- TRUE
+saveRGL <- FALSE
 drawPlotly <- FALSE
 savePlotly <- FALSE
 lon0to360=FALSE
@@ -60,20 +60,24 @@ outputName <- paste0(c(USStatevec,CAProvincevec,USParkvec),collapse="-")
 ####    set up cropping mask file and vector of states/etc
 mapcrop <- NULL
 statesInMap <- NULL
-## mapWindow crops 
-if (!is.null(mapWindow)) {
-  mapcrop <- raster::extent(mapWindow)
-  CP <- as(mapcrop, "SpatialPolygons")
-  sp::proj4string(CP) <- workProj4
-  mapcrop <- rgeos::gUnaryUnion(CP)
-}
 if (!is.null(USStatevec)) {
   USStatevec <- expandRegions(unique(toupper(USStatevec)),"US")  # US State abbrev all upper case
   statesInMap <- union(statesInMap,USStatevec)  
-  mcrop <- rgeos::gUnaryUnion(sp::spTransform(tigris::counties(statesInMap),sp::CRS(workProj4))) 
-  ## tigris returns a SpatialPolgonsDF and 
-  ##    gUnaryUnion returns a SpatialPolygons
+  mcrop <- tigris::counties(statesInMap) %>% 
+           rgeos::gUnaryUnion(.) %>% 
+           sp::spTransform(.,sp::CRS(workProj4))
+  ## tigris returns a SpatialPolgonsDF and gUnaryUnion returns a SpatialPolygons
   mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop)
+}
+if (!is.null(CAProvincevec)) {
+  CAProvincevec <- expandRegions(unique(toupper(CAProvincevec)),"CANADA")
+  statesInMap <- union(statesInMap,CAProvincevec)
+  canada <- raster::getData("GADM",country="CAN",level=1) %>%
+            sp::spTransform(.,sp::CRS(workProj4))
+  mcrop <- canada[canada$HASC_1 %in% paste0("CA.",CAProvincevec),] %>%
+           rgeos::gUnaryUnion(.)
+  # simplify - BC coast is extremely complex
+  mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop,simplifytol = 1) 
 }
 if (!is.null(USParkvec)) {
   USParkvec <- unique(toupper(USParkvec))
@@ -91,15 +95,6 @@ if (!is.null(USParkvec)) {
   mcrop <- as(parkareas, "Spatial")  
   mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop)
 }
-if (!is.null(CAProvincevec)) {
-  CAProvincevec <- expandRegions(unique(toupper(CAProvincevec)),"CANADA")
-  statesInMap <- union(statesInMap,CAProvincevec)
-  canada <- raster::getData("GADM",country="CAN",level=1) # raster + spatial
-  canada <-  sp::spTransform(canada,sp::CRS(workProj4))
-  mcrop <- rgeos::gUnaryUnion(canada[canada$HASC_1 %in% paste0("CA.",CAProvincevec),])
-  # simplify - BC coast is extremely complex
-  mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop,simplifytol = 1) 
-}
 if (!is.null(worldCountryvec)) { 
   worldCountryvec <- unique(toupper(worldCountryvec))
   statesInMap <- union(statesInMap,worldCountryvec)
@@ -116,6 +111,14 @@ if (!is.null(worldCountryvec)) {
   }
   mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop,simplifytol = 1)
 }
+## mapWindow - overwrite the map used for cropping, 
+##     but not the list of states/provinces to load
+if (!is.null(mapWindow)) {
+  mapcrop <- raster::extent(mapWindow)
+  CP <- as(mapcrop, "SpatialPolygons")
+  sp::proj4string(CP) <- workProj4
+  mapcrop <- rgeos::gUnaryUnion(CP)
+}
 mapcrop <- bufferUnion(mapcrop,mapbuffer=mapbuffer,NULL,simplifytol = 0)
 
 #   now crop by the cropbox unless saving
@@ -129,7 +132,7 @@ plot(mapcrop)  #  which has CRS = workProj4
 ####################################################################################
 if (loadStateElevs) {
   statesInMap <- USStatevec
-  tmp <- loadStateElevData(USStatevec,CAProvincevec)  
+  print(system.time(tmp <- loadStateElevData(USStatevec,CAProvincevec))[[3]])
   mapcrop <- raster::extent(cropbox)
   CP <- as(mapcrop, "SpatialPolygons")
   sp::proj4string(CP) <- workProj4
@@ -148,19 +151,15 @@ if (loadStateElevs) {
   spWaterL <- NULL
   if (!is.null(USStatevec)) {
     tmp <- USFeatures(USStatevec,workProj4,
-                      showCities=showCities | writeElevFile,
-                      showRoads=showRoads | writeElevFile,
-                      showWater=showWater | writeElevFile)
+                      writeShapefiles=writeElevFile,
+                      shapefiledir=paste0(datadir,"/shapefiles/"))
     spTown <- rbind_NULLok(spTown,tmp[["spTown"]])
     spRoads <- rbind_NULLok(spRoads,tmp[["spRoads"]])
     spWaterA <- rbind_NULLok(spWaterA,tmp[["spWaterA"]])
     spWaterL <- rbind_NULLok(spWaterL,tmp[["spWaterL"]])
   }
   if (!is.null(CAProvincevec)) {
-    tmp <- CAFeatures(CAProvincevec,workProj4,
-                      showCities=showCities | writeElevFile,
-                      showRoads=showRoads | writeElevFile,
-                      showWater=showWater | writeElevFile)
+    tmp <- CAFeatures(CAProvincevec,workProj4)
     spTown <- rbind_NULLok(spTown,tmp[["spTown"]])
     spRoads <- rbind_NULLok(spRoads,tmp[["spRoads"]])
     spWaterA <- rbind_NULLok(spWaterA,tmp[["spWaterA"]])
@@ -170,7 +169,7 @@ if (loadStateElevs) {
   if (!raster::compareCRS(raster::crs(m.sub),sp::CRS(workProj4)))
     m.sub <- raster::projectRaster(m.sub,crs=workProj4)
 }
-spTown <- gIntersection(spTown,mapcrop)
+spTown <- sxdfMask(spTown,mapcrop)
 elevations <- m.sub
 
 
@@ -205,20 +204,6 @@ if (writeElevFile & (length(statesInMap)==1)) {
                   overwrite=TRUE)    
     }
   }
-  if (USStatevec[[1]]==statesInMap[[1]]) {
-    raster::shapefile(spRoads,filename=paste0(datadir,"/shapefiles/",
-                                              statesInMap[[1]],"Roads.shp"),
-                      overwrite=TRUE)
-    raster::shapefile(spWaterA,filename=paste0(datadir,"/shapefiles/",
-                                               statesInMap[[1]],"WaterA.shp"),
-                      overwrite=TRUE)
-    raster::shapefile(spWaterL,filename=paste0(datadir,"/shapefiles/",
-                                               statesInMap[[1]],"WaterL.shp"),
-                      overwrite=TRUE)
-    raster::shapefile(spTown,filename=paste0(datadir,"/shapefiles/",
-                                               statesInMap[[1]],"Town.shp"),
-                      overwrite=TRUE)
-  }
 }
 #############################################################################
 # crop raster after write
@@ -229,8 +214,10 @@ print(paste0(elevations@ncols," columns by ",elevations@nrows," rows"))
 sfact <- max(1,floor(max(elevations@ncols,elevations@nrows)/res3dplot))
 print(paste0("scaling raster down by a factor of ",sfact))
 if (sfact > 1)
+  print(system.time(
   elevations <- raster::aggregate(elevations,fact=sfact,fun=mean,
                            expand=TRUE,na.rm=FALSE)
+  )[[3]])
 print(paste0(elevations@ncols," columns by ",elevations@nrows," rows"))
 
 if (drawRGL | drawPlotly) {
@@ -254,7 +241,8 @@ if (drawRGL | drawPlotly) {
                                 camera=list(up=c(0,1,0),
                                             eye=c(0,1.25,0)) ) )
     p
-    if (savePlotly) htmlwidgets::saveWidget(p,paste0(mapoutputdir,"/",outputName," map.html"))
+    if (savePlotly) 
+      htmlwidgets::saveWidget(p,paste0(mapoutputdir,"/",outputName," map.html"))
   }
   if (drawRGL) {  # mmmelev,cropbox, mapcrop.crs, showxx/spxx, palette, highelevation, yscale, vertscale
     x <- seq(1,length.out=nrow(mmmelev))
@@ -265,8 +253,8 @@ if (drawRGL | drawPlotly) {
 
     if (showCities | showWater | showRoads) {      
       print("building features")
-      featurelayer <- raster::raster(nrow=nrow(elevations), ncol=ncol(elevations), 
-                                     ext=extent(elevations), crs=crs(elevations))
+      featurelayer <- raster::raster(nrow=nrow(elevations),ncol=ncol(elevations), 
+                                     ext=extent(elevations),crs=crs(elevations))
       featurelayer[] <- 0
       if (showCities & !is.null(spTown)) {
         print("towns")
@@ -307,11 +295,11 @@ if (drawRGL | drawPlotly) {
                                      "yellow","gold","goldenrod",
                                      "sienna","brown","gray55",
                                      "gray65","gray80","gray90","white"))(206)
-    terrcolors <- colorRampPalette(c("blue2",
+    terrcolors <- colorRampPalette(c("aquamarine",
                                      "palegreen","yellowgreen","lawngreen",
                                      "chartreuse","greenyellow","green",
                                      "limegreen","forestgreen","darkgreen",
-                                     "yellow","gold","goldenrod",
+                                     "olivedrab","gold","goldenrod",
                                      "sienna","brown","gray55",
                                      "gray65","gray80","gray90","white"))(206)
     plot(rep(1,206),col=terrcolors, pch=19,cex=2)
@@ -345,6 +333,8 @@ if (drawRGL | drawPlotly) {
                    viewpoint.rel=TRUE, specular="black")
     rgl::rgl.viewpoint(userMatrix=userMatrix,type="modelviewpoint")
     pan3d(2)  # right button for panning, doesn't play well with zoom)
-    if (saveRGL) rgl::writeWebGL(dir=paste0(mapoutputdir), filename=paste0(mapoutputdir,"/",outputName," rgl map.html"))
+    if (saveRGL) 
+      rgl::writeWebGL(dir=paste0(mapoutputdir), 
+                      filename=paste0(mapoutputdir,"/",outputName," rgl map.html"))
   }
 }
