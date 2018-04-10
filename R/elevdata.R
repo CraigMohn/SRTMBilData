@@ -11,14 +11,16 @@ library(sf)
 
 source("C:/bda/SRTMBilData/R/functions.R")
 source("C:/bda/SRTMBilData/R/regionDefs.R")
+mapWindow <- USStatevec <- USParkvec <- CAProvincevec <- worldCountryvec <- NULL 
 mapLibSelector <- 1  # 1=northAmerica+NE Pacific 1s, 2=Europe 3s, 3=Australia 3s
-mapWindow <- NULL 
-USStatevec <- c("MountainWest","CA","NM","AZ")
-USParkvec <- NULL # <- c("CANY","CEBR","BRCA","ARCH") 
-CAProvincevec <- c("BC","AB","SK")
-worldCountryvec <- NULL # <- c("DEU","AUT","CZE","CHE","FRA") #NULL # <- c("ESP","PRT","FRA") # http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html
+
+mapWindow <- c(-122.7,-121.8,37.4,38.3)     # East Bay
+USStatevec <- c("CA") #  c("MountainWest","CA","NM","AZ")
+#USParkvec <- c("CANY","CEBR","BRCA","ARCH") 
+#CAProvincevec <- "BC" # c("BC","AB","SK")
+#worldCountryvec <-  c("DEU","AUT","CZE","CHE","FRA") #NULL # <- c("ESP","PRT","FRA") # http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html
 showWater <- TRUE
-waterLevel <- "area"  # "named","area","rivers","all"
+waterLevel <- "riversplus"  # "named","lakes",area","rivers","riversplus","all"
 showRoads <- TRUE
 showCities <- TRUE
 
@@ -26,18 +28,20 @@ mapbuffer <- 1000 #5000     # meters, expands overall area
 mapmergebuffer <- 200  # meters, expands categories before merging with others
 
 cropbox <- raster::extent(-180, 170, -50, 60)  
-#cropbox <- raster::extent(-160.25, -154.8, -18.9, 22.25) # hawaii main islands only
+if (!is.null(mapWindow)) cropbox <- raster::extent(mapWindow)
+#cropbox <- raster::extent(-160.25, -154.8, 18.9, 22.25) # hawaii main islands only
 #cropbox <- raster::extent(-180, 170, -50, 52.1) #  southern slice of BC,AB,SK 
-res3dplot <- 6000
-loadStateElevs <-  TRUE
+res3dplot <- 3200
+loadStateElevs <-  FALSE
 writeElevFile <- FALSE
 forceRes <- NULL
 maxrastercells <- 500000000
 highelevation <- 3000
-vertscale <- 1.0
+vertscale <- 1.8   
 rglNAcolor <- "Blue"
+citycolor <- "White"
 drawRGL <- TRUE
-saveRGL <- FALSE
+saveRGL <- TRUE
 drawPlotly <- FALSE
 savePlotly <- FALSE
 lon0to360=FALSE
@@ -64,8 +68,8 @@ if (!is.null(USStatevec)) {
   USStatevec <- expandRegions(unique(toupper(USStatevec)),"US")  # US State abbrev all upper case
   statesInMap <- union(statesInMap,USStatevec)  
   mcrop <- tigris::counties(statesInMap) %>% 
-           rgeos::gUnaryUnion(.) %>% 
-           sp::spTransform(.,sp::CRS(workProj4))
+    rgeos::gUnaryUnion(.) %>% 
+    sp::spTransform(.,sp::CRS(workProj4))
   ## tigris returns a SpatialPolgonsDF and gUnaryUnion returns a SpatialPolygons
   mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop)
 }
@@ -73,9 +77,9 @@ if (!is.null(CAProvincevec)) {
   CAProvincevec <- expandRegions(unique(toupper(CAProvincevec)),"CANADA")
   statesInMap <- union(statesInMap,CAProvincevec)
   canada <- raster::getData("GADM",country="CAN",level=1) %>%
-            sp::spTransform(.,sp::CRS(workProj4))
+    sp::spTransform(.,sp::CRS(workProj4))
   mcrop <- canada[canada$HASC_1 %in% paste0("CA.",CAProvincevec),] %>%
-           rgeos::gUnaryUnion(.)
+    rgeos::gUnaryUnion(.)
   # simplify - BC coast is extremely complex
   mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop,simplifytol = 1) 
 }
@@ -133,10 +137,6 @@ plot(mapcrop)  #  which has CRS = workProj4
 if (loadStateElevs) {
   statesInMap <- USStatevec
   print(system.time(tmp <- loadStateElevData(USStatevec,CAProvincevec))[[3]])
-  mapcrop <- raster::extent(cropbox)
-  CP <- as(mapcrop, "SpatialPolygons")
-  sp::proj4string(CP) <- workProj4
-  mapcrop <- rgeos::gUnaryUnion(CP)
   spTown <- sp::spTransform(tmp[["spTown"]],sp::CRS(workProj4))
   spRoads <- sp::spTransform(tmp[["spRoads"]],sp::CRS(workProj4))
   spWaterA <- sp::spTransform(tmp[["spWaterA"]],sp::CRS(workProj4))
@@ -144,6 +144,7 @@ if (loadStateElevs) {
   m.sub <- tmp[["elevraster"]]
   if (!raster::compareCRS(raster::crs(m.sub),sp::CRS(workProj4)))
     m.sub <- raster::projectRaster(m.sub,crs=workProj4)
+  m.sub <- raster::mask(m.sub,mapcrop)
 } else {
   spTown <- NULL
   spRoads <- NULL
@@ -215,13 +216,13 @@ sfact <- max(1,floor(max(elevations@ncols,elevations@nrows)/res3dplot))
 print(paste0("scaling raster down by a factor of ",sfact))
 if (sfact > 1)
   print(system.time(
-  elevations <- raster::aggregate(elevations,fact=sfact,fun=mean,
-                           expand=TRUE,na.rm=FALSE)
+    elevations <- raster::aggregate(elevations,fact=sfact,fun=mean,
+                                    expand=TRUE,na.rm=FALSE)
   )[[3]])
 print(paste0(elevations@ncols," columns by ",elevations@nrows," rows"))
 
 if (drawRGL | drawPlotly) {
-
+  
   yscale <- yRatio(elevations)
   mmmelev <- raster::as.matrix(elevations)
   if (drawPlotly) {
@@ -244,50 +245,72 @@ if (drawRGL | drawPlotly) {
     if (savePlotly) 
       htmlwidgets::saveWidget(p,paste0(mapoutputdir,"/",outputName," map.html"))
   }
-  if (drawRGL) {  # mmmelev,cropbox, mapcrop.crs, showxx/spxx, palette, highelevation, yscale, vertscale
+  if (drawRGL) {  # mmmelev,mapcrop, showxx/spxx, palette, highelevation, yscale, vertscale
     x <- seq(1,length.out=nrow(mmmelev))
     y <- seq(1,length.out=ncol(mmmelev))
     
-    CP <- as(doubleExtent(cropbox), "SpatialPolygons")
-    sp::proj4string(CP) <- CRS(sp::proj4string(mapcrop))
-
     if (showCities | showWater | showRoads) {      
+      CP <- as(doubleExtent(elevations), "SpatialPolygons")
+      sp::proj4string(CP) <- CRS(sp::proj4string(mapcrop))
+
       print("building features")
       featurelayer <- raster::raster(nrow=nrow(elevations),ncol=ncol(elevations), 
                                      ext=extent(elevations),crs=crs(elevations))
       featurelayer[] <- 0
+      print(featurelayer@data@min)
+      print(featurelayer@data@max)
       if (showCities & !is.null(spTown)) {
         print("towns")
-        spTown <- raster::crop(spTown, CP)
-        featurelayer <- raster::rasterize(spTown,featurelayer,
-                                          field=1,update=TRUE)
+        tspTown <- raster::intersect(spTown, mapcrop)
+        if (!is.null(tspTown)) {
+          plot(tspTown,col=citycolor)
+          for (i in 1:nrow(tspTown)) {
+            print(tspTown@data[i,"NAME"])
+            plot(tspTown[i,],col=citycolor)
+            featurelayer <- raster::rasterize(tspTown[i,],featurelayer,
+                                              field=1,update=TRUE)
+          }
+        }
+        print(featurelayer@data@min)
+        print(featurelayer@data@max)
       }
-      if (showWater) {
-        spWaterL <- filterWaterL(spWaterL,level=waterLevel)
-        if (!is.null(spWaterA)) {
+      if (showWater & !is.null(spWaterA)) {
+        tspWaterA <- filterWaterA(spWaterA,level=waterLevel) # need new copy since not in function
+        tspWaterA <- raster::intersect(tspWaterA, mapcrop)
+        if (!is.null(tspWaterA)) {
           print("water polygons")
-          spWaterA <- raster::crop(spWaterA, CP)
-          featurelayer <- raster::rasterize(spWaterA,featurelayer,
-                                            field=2,update=TRUE)
+          plot(tspWaterA, col="blue")
+          featurelayer <- raster::rasterize(tspWaterA,featurelayer,
+                                          field=2,update=TRUE)
         }
-        spWaterL <- filterWaterL(spWaterL,level=waterLevel)
-        if (!is.null(spWaterL)) {
+        print(featurelayer@data@min)
+        print(featurelayer@data@max)
+      }
+      if (showWater & !is.null(spWaterL)) {
+        tspWaterL <- filterWaterL(spWaterL,level=waterLevel)  # need new copy since not in function
+        if (!is.null(tspWaterL)) {
           print("water lines")
-          spWaterL <- raster::crop(rgeos::gLineMerge(spWaterL), CP)
-          featurelayer <- raster::rasterize(spWaterL,featurelayer,
+          tspWaterL <- raster::crop(rgeos::gLineMerge(tspWaterL), CP)
+          plot(tspWaterL, col="blue")
+          featurelayer <- raster::rasterize(tspWaterL,featurelayer,
                                             field=2,update=TRUE)
         }
+        print(featurelayer@data@min)
+        print(featurelayer@data@max)
       }
       if (showRoads & !is.null(spRoads)) {
         print("roads")
-        spRoads <- raster::crop(rgeos::gLineMerge(spRoads), CP)
-        featurelayer <- raster::rasterize(spRoads,featurelayer,
+        tspRoads <- raster::crop(rgeos::gLineMerge(spRoads), CP)
+        plot(tspRoads)
+        featurelayer <- raster::rasterize(tspRoads,featurelayer,
                                           field=3,update=TRUE)
+        print(featurelayer@data@min)
+        print(featurelayer@data@max)
       }
       features <- raster::as.matrix(featurelayer)
       print("features done")
     }
-#   create a few palettes - PNW, islands, bright pastel
+    #   create a few palettes - PNW, islands, bright pastel
     terrcolors <- colorRampPalette(c("blue","turquoise","aquamarine",
                                      "palegreen","yellowgreen",
                                      "chartreuse","greenyellow","green",
@@ -295,13 +318,24 @@ if (drawRGL | drawPlotly) {
                                      "yellow","gold","goldenrod",
                                      "sienna","brown","gray55",
                                      "gray65","gray80","gray90","white"))(206)
-    terrcolors <- colorRampPalette(c("aquamarine",
-                                     "palegreen","yellowgreen","lawngreen",
-                                     "chartreuse","greenyellow","green",
+    ### standard
+    terrcolors <- colorRampPalette(c("blue","darkturquoise","turquoise","aquamarine",
+                                     "palegreen","greenyellow","lawngreen",
+                                     "chartreuse","green","springgreen",
                                      "limegreen","forestgreen","darkgreen",
-                                     "olivedrab","gold","goldenrod",
-                                     "sienna","brown","gray55",
-                                     "gray65","gray80","gray90","white"))(206)
+                                     "olivedrab","darkkhaki","darkgoldenrod",
+                                     "sienna","brown","saddlebrown","rosybrown",
+                                     "gray35","gray45","gray55",
+                                     "gray65","gray70","gray75","gray85"))(206)
+    ### beaches
+#    terrcolors <- colorRampPalette(c("blue","bisque1","bisque2","bisque3",
+#                                     "palegreen","greenyellow","lawngreen",
+#                                     "chartreuse","green","springgreen",
+#                                     "limegreen","forestgreen","darkgreen",
+#                                     "olivedrab","darkkhaki","darkgoldenrod",
+#                                     "sienna","brown","saddlebrown","rosybrown",
+#                                     "gray35","gray45","gray55",
+#                                     "gray65","gray70","gray75","gray85"))(206)
     plot(rep(1,206),col=terrcolors, pch=19,cex=2)
     
     tmpelev <- mmmelev/highelevation # don't worry about memory, not the constraint here
@@ -312,12 +346,12 @@ if (drawRGL | drawPlotly) {
     colidx[colidx>201] <- 201
     colidx[colidx<1] <- 1
     colidx <- colidx + 5
-    colidx[mmmelev <= 10]  <- 3
+    colidx[mmmelev == 0]  <- 1
     col <- terrcolors[colidx]
     col[is.na(mmmelev)] <- gplots::col2hex(rglNAcolor)
     mmmelev[is.na(mmmelev)] <- -50
     if (showCities | showWater | showRoads) {
-      col[features==1] <- gplots::col2hex("PeachPuff")
+      col[features==1] <- gplots::col2hex(citycolor)
       col[features==2] <- gplots::col2hex("Blue")
       col[features==3] <- gplots::col2hex("Black")
     }

@@ -271,26 +271,29 @@ USFeatures <- function(USStatevec,workProj4,
     tmpT <- sxdfMask(spTownUS,stMask,keepTouch=TRUE) #keep if town touches the state
     # type is   A pop >= 50k, 2.5k <= U pop < 50k    
     spTown <- rbind_NULLok(spTown,tmpT)
-    
+    plot(tmpT)    
     tmpR <- sp::spTransform(tigris::primary_secondary_roads(st),workProj4) # SpatialPolygonsDF
     tmpR <- tmpR[,(names(tmpR) %in% c("FULLNAME","MTFCC"))]
     colnames(tmpR@data) <- c("NAME","TYPE")  
     # type is   S1100=secondary   S1200=Primary
     spRoads <- rbind_NULLok(spRoads,tmpR)
+    plot(tmpR)    
     
     tmpA <- NULL
     tmpL <- NULL
     for (c in tigris::list_counties(st)[["county_code"]]) {
-      #spatialPolygon dataframe
-      tmpA <- rbind_NULLok(tmpA,
-                           sp::spTransform(tigris::area_water(st,c),workProj4)) 
-      #spatialLines dataframe
-      tmpL <- rbind_NULLok(tmpL,
-                           sp::spTransform(tigris::linear_water(st,c),workProj4))
+      if (!(c == "515" & st == "VA")) {   #Bedford Town not in data?!?
+        #spatialPolygon dataframe
+        tmpA <- rbind_NULLok(tmpA,
+                             sp::spTransform(tigris::area_water(st,c),workProj4)) 
+        #spatialLines dataframe
+        tmpL <- rbind_NULLok(tmpL,
+                             sp::spTransform(tigris::linear_water(st,c),workProj4)) 
+      }
     }  
     tmpA <- tmpA[,(names(tmpA) %in% c("FULLNAME","MTFCC"))]
     colnames(tmpA@data) <- c("NAME","TYPE")  
-    # type is   H2025=Swamp,H2030=Lake/Pond,H22040=Reservoir,H2041=TreatmentPond,
+    # type is   H2025=Swamp,H2030=Lake/Pond,H2040=Reservoir,H2041=TreatmentPond,
     #           H2051=Bay/Est/Sound,H2053=Ocean,H2060=Pit/Quarry,H2081=Glacier
     tmpL <- tmpL[,(names(tmpL) %in% c("FULLNAME","MTFCC"))]
     colnames(tmpL@data) <- c("NAME","TYPE")  
@@ -300,7 +303,8 @@ USFeatures <- function(USStatevec,workProj4,
     if (writeShapefiles) writeFeatures(st,shapefiledir=shapefiledir,
                                        spTown=tmpT,spRoads=tmpR,
                                        spWaterA=tmpA,spWaterL=tmpL)
-
+plot(tmpA)
+plot(tmpL)
     spWaterA <- rbind_NULLok(spWaterA,tmpA)
     spWaterL <- rbind_NULLok(spWaterL,tmpL)
   }
@@ -365,18 +369,24 @@ filterWaterA <- function(waterLineDF,level="named") {
   if (level == "named") {
     tmpkeep <- !is.na(waterLineDF@data[,"NAME"])
     return(waterLineDF[tmpkeep,])
+  } else if (level=="lakes") {
+    tmpkeep <- waterLineDF@data[,"TYPE"] %in% c("H2030")
+    return(waterLineDF[tmpkeep,])
+  } else if (level=="noarea") {
+    return(NULL)
   } else {
     return(waterLineDF)
   } 
 }
 filterWaterL <- function(waterLineDF,level="area") {
-  if (level=="area") {
+  if (is.null(waterLineDF)) return(NULL)
+  if (level=="area" | level == "lakes") {
     return(NULL)
   } else if (level=="all") {
     return(waterLineDF)
   } else {
     tmpname <- waterLineDF@data[,"NAME"]
-    if (level == "rivers") {
+    if ((level == "rivers") | (level == "noarea")) {
       tmpkeep <- grepl("Riv",tmpname)
     } else if (level == "riversplus") {
       tmpkeep <- !is.na(tmpname) & 
