@@ -2,12 +2,16 @@ library(raster)
 library(rgeos)
 library(sp)
 
+#  script to extract Canada shapefiles for towns, roads and water, do rough filtering, 
+#      format to match US versions, and save in directory
+
 datadir <- "c:/bda"                    #  base dir - subs include shapefiles, rasterfile 
 workProj4 <- "+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs"
 
+
+###########################################################################################
 #  download data from census canada, unzip into datadir/CanadaShapefiles/
 #     creates shapefiles for province roads, cities, water in directory datadir/shapefiles
-
 ########################### can skip to load if restarting from saved results
 
 canada <- raster::getData("GADM",country="CAN",level=1) # spatial dataframe

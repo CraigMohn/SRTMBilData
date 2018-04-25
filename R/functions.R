@@ -1,42 +1,3 @@
-yRatio <- function(rrr) {
-  xmin <- rrr@extent@xmin
-  xmax <- rrr@extent@xmax
-  ymin <- rrr@extent@ymin
-  ymax <- rrr@extent@ymax
-  return(yRatioPts(xmin,xmax,ymin,ymax))
-}
-yRatioPts <- function(xmin,xmax,ymin,ymax) {
-  width <-
-    (raster::pointDistance(cbind(xmin,ymin),cbind(xmax,ymin),lonlat=TRUE) +
-       raster::pointDistance(cbind(xmin,ymax),cbind(xmax,ymax),lonlat=TRUE)) / 2
-  height <-
-    (raster::pointDistance(cbind(xmin,ymin),cbind(xmin,ymax),lonlat=TRUE) +
-       raster::pointDistance(cbind(xmax,ymin),cbind(xmax,ymax),lonlat=TRUE)) / 2
-  return(height/width)
-}
-pan3d <- function(button) {
-  start <- list()
-  begin <- function(x, y) {
-    start$userMatrix <<- rgl::par3d("userMatrix")
-    start$viewport <<- rgl::par3d("viewport")
-    start$scale <<- rgl::par3d("scale")
-    start$projection <<- rgl::rgl.projection()
-    start$pos <<- rgl::rgl.window2user( x/start$viewport[3], 
-                                        1 - y/start$viewport[4], 
-                                        0.5,
-                                        projection = start$projection)
-  }
-  update <- function(x, y) {
-    xlat <- (rgl::rgl.window2user( x/start$viewport[3], 
-                                   1 - y/start$viewport[4], 
-                                   0.5,
-                                   projection = start$projection) - start$pos)*start$scale
-    mouseMatrix <- rgl::translationMatrix(xlat[1], xlat[2], xlat[3])
-    rgl::par3d(userMatrix = start$userMatrix %*% t(mouseMatrix) )
-  }
-  rgl::rgl.setMouseCallbacks(button, begin, update)
-  cat("Callbacks set on button", button, "of rgl device", rgl.cur(), "\n")
-}
 
 addmapfiles <- function(filenames,lonChar,minLon,maxLon,latChar,minLat,maxLat,
                         resstr="_1arc_v3_bil") {
@@ -224,7 +185,7 @@ loadMapElevData <- function(mapcrop) {
                                 proj4string=CRS("+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs"))
       if (rgeos::gContainsProperly(mapcrop, ei)) {
         print("interior - not masked")
-      } else if (gIntersects(mapcrop, ei)) {
+      } else if (rgeos::gIntersects(mapcrop, ei)) {
         print(paste0("boundary - masking time = ",system.time(
           tmp <- raster::mask(raster::crop(tmp, extent(mapcrop),snap="near"),
                               mapcrop)
@@ -253,172 +214,24 @@ loadMapElevData <- function(mapcrop) {
   }
   return(m.sub)
 }
-
-
-
-USFeatures <- function(USStatevec,workProj4,
-                       writeShapefiles=FALSE,shapefiledir) {
-  spTown <- NULL
-  spRoads <- NULL
-  spWaterA <- NULL
-  spWaterL <- NULL
-  
-  spTownUS <- sp::spTransform(tigris::urban_areas(),workProj4) # SpatialPolygonsDF
-  spTownUS <- spTownUS[,(names(spTownUS) %in% c("NAME10","UATYP10"))]
-  colnames(spTownUS@data) <- c("NAME","TYPE") # type is   A pop >= 50k, 2.5k <= U pop < 50k
-  for (st in USStatevec) {
-    stMask <- sp::spTransform(tigris::counties(st),sp::CRS(workProj4))
-    tmpT <- sxdfMask(spTownUS,stMask,keepTouch=TRUE) #keep if town touches the state
-    # type is   A pop >= 50k, 2.5k <= U pop < 50k    
-    spTown <- rbind_NULLok(spTown,tmpT)
-    plot(tmpT)    
-    tmpR <- sp::spTransform(tigris::primary_secondary_roads(st),workProj4) # SpatialPolygonsDF
-    tmpR <- tmpR[,(names(tmpR) %in% c("FULLNAME","MTFCC"))]
-    colnames(tmpR@data) <- c("NAME","TYPE")  
-    # type is   S1100=secondary   S1200=Primary
-    spRoads <- rbind_NULLok(spRoads,tmpR)
-    plot(tmpR)    
-    
-    tmpA <- NULL
-    tmpL <- NULL
-    for (c in tigris::list_counties(st)[["county_code"]]) {
-      if (!(c == "515" & st == "VA")) {   #Bedford Town not in data?!?
-        #spatialPolygon dataframe
-        tmpA <- rbind_NULLok(tmpA,
-                             sp::spTransform(tigris::area_water(st,c),workProj4)) 
-        #spatialLines dataframe
-        tmpL <- rbind_NULLok(tmpL,
-                             sp::spTransform(tigris::linear_water(st,c),workProj4)) 
-      }
-    }  
-    tmpA <- tmpA[,(names(tmpA) %in% c("FULLNAME","MTFCC"))]
-    colnames(tmpA@data) <- c("NAME","TYPE")  
-    # type is   H2025=Swamp,H2030=Lake/Pond,H2040=Reservoir,H2041=TreatmentPond,
-    #           H2051=Bay/Est/Sound,H2053=Ocean,H2060=Pit/Quarry,H2081=Glacier
-    tmpL <- tmpL[,(names(tmpL) %in% c("FULLNAME","MTFCC"))]
-    colnames(tmpL@data) <- c("NAME","TYPE")  
-    # type is   H3010=Stream/River,H3013=BraidedStream,H3020=Canal/Ditch
-    tmpL <- tmpL[tmpL@data[,"TYPE"]=="H3010",]  # keep only rivers and streams H3010
-
-    if (writeShapefiles) writeFeatures(st,shapefiledir=shapefiledir,
-                                       spTown=tmpT,spRoads=tmpR,
-                                       spWaterA=tmpA,spWaterL=tmpL)
-plot(tmpA)
-plot(tmpL)
-    spWaterA <- rbind_NULLok(spWaterA,tmpA)
-    spWaterL <- rbind_NULLok(spWaterL,tmpL)
-  }
-  
-  if (!is.null(spTown)) plot(spTown)
-  if (!is.null(spRoads)) plot(spRoads)
-  if (!is.null(spWaterA)) plot(spWaterA)
-  if (!is.null(spWaterL)) plot(spWaterL)
-
-  return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
-}
-CAFeatures <- function(CAProvincevec,workProj4) {
-  spTown <- NULL
-  spRoads <- NULL
-  spWaterA <- NULL
-  spWaterL <- NULL
-  ##  files are already filtered for city/road/polygonwater importance
-  for (pr in CAProvincevec) {
-    print(paste0("loading features for ",pr))
-    if (showCities) {
-      tmp <- raster::shapefile(paste0(datadir,"/shapefiles/",pr,
-                                      "Town.shp")) # SpatialPolygonsDF
-      tmp <- sp::spTransform(tmp,workProj4)
-      spTown <- rbind_NULLok(spTown,tmp)
-     }
-    if (showRoads) {
-      tmp <- raster::shapefile(paste0(datadir,"/shapefiles/",pr,
-                                      "Roads.shp")) # SpatialLinesDF
-      tmp <- sp::spTransform(tmp,workProj4)
-      spRoads <- rbind_NULLok(spRoads,tmp)
-    }
-    if (showWater) {
-      tmp <- raster::shapefile(paste0(datadir,"/shapefiles/",pr,
-                                      "WaterA")) # SpatialPolygonsDF
-      tmp <- sp::spTransform(tmp,workProj4)
-      spWaterA <- rbind_NULLok(spWaterA,tmp)
-      tmp <- raster::shapefile(paste0(datadir,"/shapefiles/",pr,
-                                      "WaterL")) # SpatialLinesDF
-      tmp <- sp::spTransform(tmp,workProj4)
-      spWaterL <- rbind_NULLok(spWaterL,tmp)
-    }
-  }
-  if (!is.null(spTown)) plot(spTown, col="PeachPuff")
-  if (!is.null(spRoads)) plot(spRoads)
-  if (!is.null(spWaterA)) plot(spWaterA)
-  if (!is.null(spWaterL)) plot(spWaterL)
-  return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
-}
-writeFeatures <- function(stname,shapefiledir,spTown,spRoads,spWaterA,spWaterL) {
-  print(paste0("writing feature shapefiles for ",stname))
-  raster::shapefile(spRoads,filename=paste0(shapefiledir,"/",stname,"Roads.shp"),
-                    overwrite=TRUE)
-  raster::shapefile(spWaterA,filename=paste0(shapefiledir,"/",stname,"WaterA.shp"),
-                    overwrite=TRUE)
-  raster::shapefile(spWaterL,filename=paste0(shapefiledir,"/",stname,"WaterL.shp"),
-                    overwrite=TRUE)
-  raster::shapefile(spTown,filename=paste0(shapefiledir,"/",stname,"Town.shp"),
-                    overwrite=TRUE)
-  return(NULL)
-}
-filterWaterA <- function(waterLineDF,level="named") {
-  if (level == "named") {
-    tmpkeep <- !is.na(waterLineDF@data[,"NAME"])
-    return(waterLineDF[tmpkeep,])
-  } else if (level=="lakes") {
-    tmpkeep <- waterLineDF@data[,"TYPE"] %in% c("H2030")
-    return(waterLineDF[tmpkeep,])
-  } else if (level=="noarea") {
-    return(NULL)
-  } else {
-    return(waterLineDF)
-  } 
-}
-filterWaterL <- function(waterLineDF,level="area") {
-  if (is.null(waterLineDF)) return(NULL)
-  if (level=="area" | level == "lakes") {
-    return(NULL)
-  } else if (level=="all") {
-    return(waterLineDF)
-  } else {
-    tmpname <- waterLineDF@data[,"NAME"]
-    if ((level == "rivers") | (level == "noarea")) {
-      tmpkeep <- grepl("Riv",tmpname)
-    } else if (level == "riversplus") {
-      tmpkeep <- !is.na(tmpname) & 
-        !grepl("Ditch",tmpname) &
-        !grepl("Gulch",tmpname) &
-        !grepl("Cyn",tmpname) &
-        !grepl("Crk",tmpname) &
-        !grepl("Tributary",tmpname) &
-        !grepl("Watercourse",tmpname) &
-        !grepl("Strm",tmpname)
-    } else if (level == "named") {
-      tmpkeep <- !is.na(tmpname)
-    } else {
-      stop("bad value for level in filterWaterL")
-    }
-    return(waterLineDF[tmpkeep,])
-  }
-}
 sxdfMask <- function(sxdf,poly,keepTouch=FALSE) {
+  
+  #  return NULL if a) either is NULL or b) no overlap
+  #  horrible multiple returns, but....
   if (is.null(sxdf) | is.null(poly)) return(NULL) 
   
   tmpdata <- sxdf@data
-  
   tmp.1 <- rgeos::gIntersects(sxdf, poly, byid=TRUE)
   tmp.2 <- as.logical(apply(tmp.1, 2, function(x) {sum(x)} ))
+  if (sum(tmp.2) == 0) return(NULL)
   
   #  keep only intersecting sp objects in dataframe
   tmpgeo <- sxdf[tmp.2,]
   tmpdata <- tmpdata[tmp.2,]
-  if (!keepTouch) tmpgeo <- rgeos::gIntersection(tmpgeo, poly, byid=TRUE)
   row.names(tmpgeo) <- row.names(tmpdata)
-  if (class(sxdf)=="SpatialLinesDataFrame") {
+  if (!keepTouch) {
+    return(raster::intersect(tmpgeo,poly))
+  } else if (class(sxdf)=="SpatialLinesDataFrame") {
     return(sp::SpatialLinesDataFrame(tmpgeo,data=tmpdata))
   } else if (class(sxdf)=="SpatialPolygonsDataFrame") {
     return(sp::SpatialPolygonsDataFrame(tmpgeo,data=tmpdata))
