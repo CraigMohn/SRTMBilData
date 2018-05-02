@@ -1,181 +1,65 @@
-draw3DMapRgl <- function(elevations,mapPolygon,
-                         spTown,spRoads,spWaterA,spWaterL,
-                         waterLevel,colors="default",
-                         maxElev=3000,vScale=1.5,   
-                         rglNAcolor="Blue",citycolor="White",rglNegcolor=NA,
-                         saveRGL=FALSE,mapoutputdir=NA,outputName=NA,
-                         fastAreas=TRUE,polySimplify=0,
-                         polyMethod=NULL,polyWeighting=0.85,
-                         polySnapInt=0.0001) {
-  
-  yscale <- yRatio(elevations)
+draw3DMapRoute <- function(mapRaster,routeSL=NULL,
+                           featureLevels=c(3,3,2,5), #towns,roads,waterA,waterL
+                           maxElev=3000,vScale=1.5,
+                           colors="default",
+                           citycolor="White",roadcolor="Black",
+                           watercolor="Blue",glaciercolor="White",
+                           rglNAcolor="Blue",rglNegcolor=NA,
+                           saveRGL=FALSE,mapoutputdir=NA,outputName="most recent") {
+
+  if (class(mapRaster)=="RasterLayer") {
+    elevations <- mapRaster
+  } else {
+    elevations <- mapRaster[["elevations"]]
+  }  
   mmmelev <- raster::as.matrix(elevations)
   x <- seq(1,length.out=nrow(mmmelev))
   y <- seq(1,length.out=ncol(mmmelev))
+  yscale <- yRatio(elevations)
 
-  CP <- as(doubleExtent(elevations), "SpatialPolygons")
-  sp::proj4string(CP) <- CRS(sp::proj4string(mapPolygon))
-  
-  
-  if (!(is.null(spTown) &
-        is.null(spRoads) &
-        is.null(spWaterA) &
-        is.null(spWaterL))) {    
-    
-    print("building features")
-    featurelayer <- raster::raster(nrow=nrow(elevations),ncol=ncol(elevations), 
-                                   ext=extent(elevations),crs=crs(elevations))
-    featurelayer[] <- 0
-    if (!is.null(spTown)) {
-      print("towns")
-      tspTown <- raster::intersect(spTown, mapPolygon)
-      plot(tspTown,col=citycolor)
-      if (!is.null(tspTown)) {
-        if (fastAreas) {
-          featurelayer <- raster::rasterize(tspTown,featurelayer,
-                                            field=1,update=TRUE)
-          
-        } else {
-          for (i in 1:nrow(tspTown)) {
-            cat(paste0("\r",i,"  ",tspTown@data[i,"NAME"],
-                       "                                    "))
-            #plot(tspTown[i,],col=citycolor)
-            featurelayer <- raster::rasterize(tspTown[i,],featurelayer,
-                                              field=1,update=TRUE)
-          }
-        }
-        if (!is.finite(featurelayer@data@min)) {
-          warning("featurelayer mess-up")
-          print(featurelayer@data@min)
-        }
-        print(paste0(nrow(tspTown)," towns drawn"))
-      } else {
-        print("no towns to add")
-      }
-    }
-    if (!is.null(spWaterA)) {
-      print("water polygons")
-      tspWaterA <- filterWaterA(spWaterA,level=waterLevel) 
-      if (!is.null(tspWaterA)) 
-        tspWaterA <- raster::intersect(tspWaterA, mapPolygon)
-      if (!is.null(tspWaterA)) {
-        if (fastAreas) {
-          nWaterA <- nrow(tspWaterA)
-          featurelayer <- raster::rasterize(tspWaterA,featurelayer,
-                                            field=2,update=TRUE)
-          
-        } else {
-          nWaterA <- 0
-          print(paste0(nrow(tspWaterA)," water areas to process"))
-          for (i in 1:nrow(tspWaterA)) {
-            if (polySimplify == 0) {
-              temp <- rgeos::gSimplify(tspWaterA[i,],tol=0,topologyPreserve=TRUE)
-            } else {
-              temp <- rmapshaper::ms_simplify(tspWaterA[i,],keep=polySimplify,
-                                              method=polyMethod,
-                                              weighting=polyWeighting,
-                                              snap=TRUE,snap_interval=polySnapInt)
-              temp <- sp::spTransform(temp,sp::CRS(sp::proj4string(mapPolygon)))
-            }
-             if (rgeos::gIntersects(temp,mapPolygon)) {
-              cat(paste0("\r",i,"  ",tspWaterA@data[i,"NAME"],
-                         "                                 "))
-              temp <- rgeos::gIntersection(temp,mapPolygon,drop_lower_td=TRUE)
-              featurelayer <- raster::rasterize(temp,featurelayer,
-                                                field=2,update=TRUE)
-              nWaterA <- nWaterA + 1
-            }
-          }
-        }
-        plot(tspWaterA, col="blue")
-        if (!is.finite(featurelayer@data@min)) {
-          warning("featurelayer mess-up")
-          print(featurelayer@data@min)
-        }
-        print(paste0(nWaterA," water polygons drawn"))
-      } else {
-        print("no water polygons to add")
-      }
-    }
-    if (!is.null(spWaterL)) {
-      print("water lines")
-      tspWaterL <- filterWaterL(spWaterL,level=waterLevel)
-      if (!is.null(tspWaterL))tspWaterL <- raster::intersect(tspWaterL, mapPolygon)
-      if (!is.null(tspWaterL)) {
-        nWaterL <- nrow(tspWaterL)
-        tspWaterL <- rgeos::gLineMerge(tspWaterL)
-        plot(tspWaterL, col="blue")
-        featurelayer <- raster::rasterize(tspWaterL,featurelayer,
-                                          field=2,update=TRUE)
-        if (!is.finite(featurelayer@data@min)) {
-          warning("featurelayer mess-up")
-          print(featurelayer@data@min)
-        }
-        print(paste0(nWaterL," water lines drawn"))
-      } else {
-        print("no water lines to add")
-      }
-    }
-    if (!is.null(spRoads)) {
-      print("roads")
-      tspRoads <- raster::intersect(spRoads, mapPolygon) 
-      if (!is.null(tspRoads)) {
-        nRoads <- nrow(tspRoads)
-        tspRoads <- rgeos::gLineMerge(tspRoads)
-        plot(tspRoads)
-        featurelayer <- raster::rasterize(tspRoads,featurelayer,
-                                          field=3,update=TRUE)
-        if (!is.finite(featurelayer@data@min)) {
-          warning("featurelayer mess-up")
-          print(featurelayer@data@min)
-        }
-        print(paste0(nRoads," roads drawn"))
-      } else {
-        print("no roads to add")
-      }
-    }
-    features <- raster::as.matrix(featurelayer)
-    print("features done")
-  }
-  if (colors == "beach") {
-    terrcolors <- colorRampPalette(c("blue","bisque1","bisque2","bisque3",
-                                     "palegreen","greenyellow","lawngreen",
-                                     "chartreuse","green","springgreen",
-                                     "limegreen","forestgreen","darkgreen",
-                                     "olivedrab","darkkhaki","darkgoldenrod",
-                                     "sienna","brown","saddlebrown","rosybrown",
-                                     "gray35","gray45","gray55",
-                                     "gray65","gray70","gray75","gray85"))(206)
-  } else {
-    terrcolors <- colorRampPalette(c("blue","darkturquoise","turquoise","aquamarine",
-                                     "palegreen","greenyellow","lawngreen",
-                                     "chartreuse","green","springgreen",
-                                     "limegreen","forestgreen","darkgreen",
-                                     "olivedrab","darkkhaki","darkgoldenrod",
-                                     "sienna","brown","saddlebrown","rosybrown",
-                                     "gray35","gray45","gray55",
-                                     "gray65","gray70","gray75","gray85"))(206)
-  }
-  plot(rep(1,206),col=terrcolors, pch=19,cex=2)
-  
-  tmpelev <- mmmelev/maxElev # don't worry about memory, not the constraint here
+  terrcolors <- terrainColors(colors,206)
+                              
+  #  assign elevation-based colors 
+  tmpelev <- mmmelev/maxElev    #  rescale in terms of maximum
   tmpelev[is.na(tmpelev)] <- 0
-  tmpelev <- sign(tmpelev)*sqrt(abs(tmpelev)) # f(0)=0, f(1)=1, f'(x>0) decreasing, reasonable for x<0
+  #tmpelev <- sign(tmpelev)*sqrt(abs(tmpelev)) # f(0)=0, f(1)=1, f'(x>0) decreasing, reasonable for x<0
   tmpelev[mmmelev <= 0] <- 0  #  go off original 
   colidx <- floor(200*tmpelev) + 1
-  colidx[colidx>201] <- 201
-  colidx[colidx<1] <- 1
+  colidx[colidx>201] <- 201   #  cap at maxElev
+  colidx[colidx<1] <- 1       #  and at 0
   colidx <- colidx + 5
   colidx[mmmelev == 0]  <- 1
   col <- terrcolors[colidx]
   if (!is.na(rglNegcolor)) col[mmmelev < -10] <- gplots::col2hex(rglNegcolor)
   col[is.na(mmmelev)] <- gplots::col2hex(rglNAcolor)
-  mmmelev[is.na(mmmelev)] <- -50
-  if (showCities | showWater | showRoads) {
-    col[features==1] <- gplots::col2hex(citycolor)
-    col[features==2] <- gplots::col2hex("Blue")
-    col[features==3] <- gplots::col2hex("Black")
+  mmmelev[is.na(mmmelev)] <- -20    #  have missing elevations slightly below zero
+  
+  #  draw cities, water and roads in that order
+  if ("town" %in% names(mapRaster)) {
+    town <- as.matrix(mapRaster[["town"]])
+    col[ town >= featureLevels[1] ] <- gplots::col2hex(citycolor)
+    town <- NULL
   }
+  if ("waterA" %in% names(mapRaster)) {
+    waterA <- as.matrix(mapRaster[["waterA"]])
+    col[ waterA >= featureLevels[3] ] <- gplots::col2hex(watercolor)
+  }
+  if ("waterL" %in% names(mapRaster)) {
+    waterL <- as.matrix(mapRaster[["waterL"]])
+    col[ waterL >= featureLevels[4] ] <- gplots::col2hex(watercolor)
+    waterL <- NULL    
+  }
+  if ("waterA" %in% names(mapRaster)) {
+      col[ waterA == 8 ] <- gplots::col2hex(glaciercolor) # Glaciers overwrite other water
+      waterA <- NULL
+  }
+  if ("road" %in% names(mapRaster)) {
+    road <- as.matrix(mapRaster[["road"]])
+    col[ road >= featureLevels[2] ] <- gplots::col2hex(roadcolor)
+    road <- NULL
+  }
+  
+  #  and output the graph using rgl
   rgl::par3d("windowRect"= c(100,100,1200,1000))
   userMatrix <- matrix(c(-0.02,-0.80,0.632,0,1,0,0.04,0,
                          -0.03,0.60,0.80,0,0,0,0,1),ncol=4,nrow=4)
@@ -191,7 +75,38 @@ draw3DMapRgl <- function(elevations,mapPolygon,
   if (saveRGL) 
     rgl::writeWebGL(dir=paste0(mapoutputdir), 
                     filename=paste0(mapoutputdir,"/",outputName," rgl map.html"))
-
+  return(NULL)
+}
+terrainColors <- function(palettename="default",numshades=206) {
+  if (palettename == "default") {
+    terrcolors <- 
+      colorRampPalette(c("blue","darkturquoise","turquoise","aquamarine",
+                         "palegreen","greenyellow","lawngreen",
+                         "chartreuse","green","springgreen",
+                         "limegreen","forestgreen","darkgreen",
+                         "olivedrab","darkkhaki","darkgoldenrod",
+                         "sienna","brown","saddlebrown","rosybrown",
+                         "gray35","gray45","gray55",
+                         "gray65","gray70","gray75","gray85"))(numshades)
+    
+  } else if (palettename == "beach") {
+    terrcolors <- 
+      colorRampPalette(c("blue","bisque1","bisque2","bisque3",
+                         "palegreen","greenyellow","lawngreen",
+                         "chartreuse","green","springgreen",
+                         "limegreen","forestgreen","darkgreen",
+                         "olivedrab","darkkhaki","darkgoldenrod",
+                         "sienna","brown","saddlebrown","rosybrown",
+                         "gray35","gray45","gray55",
+                         "gray65","gray70","gray75","gray85"))(numshades)
+  } else if (palettename == "viridis") {
+    terrcolors <- 
+      viridis::viridis_pal(begin=0.2,end=0.9,direction=1,option="D")(numshades)
+  } else if (palettename == "plasma") {
+    terrcolors <- 
+      viridis::viridis_pal(begin=0.0,end=1.0,direction=-1,option="D")(numshades)
+  }
+  return(terrcolors)
 }
 yRatio <- function(rrr) {
   xmin <- rrr@extent@xmin

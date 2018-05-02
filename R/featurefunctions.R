@@ -1,349 +1,109 @@
-USFeatures <- function(USStatevec,workProj4,
-                       writeShapefiles=FALSE,shapefiledir) {
-  spTown <- NULL
-  spRoads <- NULL
-  spWaterA <- NULL
-  spWaterL <- NULL
-  
-  spTownUS <- sp::spTransform(tigris::urban_areas(),workProj4) # SpatialPolygonsDF
-  spTownUS <- spTownUS[,(names(spTownUS) %in% c("NAME10","UATYP10"))]
-  colnames(spTownUS@data) <- c("NAME","TYPE")
-  for (st in USStatevec) {
-    stMask <- sp::spTransform(tigris::counties(st),sp::CRS(workProj4))
-    tmpT <- sxdfMask(spTownUS,stMask,keepTouch=TRUE) #keep if town touches the state
-    # type is   U pop >= 50k, 2.5k <= C pop < 50k    
-    spTown <- rbind_NULLok(spTown,tmpT)
-    plot(tmpT)    
-    tmpR <- sp::spTransform(tigris::primary_secondary_roads(st),workProj4) # SpatialPolygonsDF
-    tmpR <- tmpR[,(names(tmpR) %in% c("FULLNAME","MTFCC"))]
-    colnames(tmpR@data) <- c("NAME","TYPE")  
-    # type is   S1100=secondary   S1200=Primary
-    spRoads <- rbind_NULLok(spRoads,tmpR)
-    plot(tmpR)    
-    
-    tmpA <- NULL
-    tmpL <- NULL
-    for (c in tigris::list_counties(st)[["county_code"]]) {
-      if (!(c == "515" & st == "VA")) {   #Bedford Town not in data?!?
-        #spatialPolygon dataframe
-        tmpA <- rbind_NULLok(tmpA,
-                             sp::spTransform(tigris::area_water(st,c),workProj4)) 
-        #spatialLines dataframe
-        tmpL <- rbind_NULLok(tmpL,
-                             sp::spTransform(tigris::linear_water(st,c),workProj4)) 
-      }
-    }  
-    tmpA$size <- as.numeric(tmpA$AWATER) + as.numeric(tmpA$ALAND)
-    tmpA <- tmpA[,(names(tmpA) %in% c("FULLNAME","MTFCC","size"))]
-    colnames(tmpA@data) <- c("NAME","TYPE","size")  
-    # type is   H2025=Swamp,H2030=Lake/Pond,H2040=Reservoir,H2041=TreatmentPond,
-    #           H2051=Bay/Est/Sound,H2053=Ocean,H2060=Pit/Quarry,H2081=Glacier
-    tmpL <- tmpL[,(names(tmpL) %in% c("FULLNAME","MTFCC"))]
-    colnames(tmpL@data) <- c("NAME","TYPE")  
-    # type is   H3010=Stream/River,H3013=BraidedStream,H3020=Canal/Ditch
-    #tmpL <- tmpL[tmpL@data[,"TYPE"]=="H3010",]  # keep only rivers and streams H3010
-
-    if (writeShapefiles) writeFeatures(st,shapefiledir=shapefiledir,
-                                       spTown=tmpT,spRoads=tmpR,
-                                       spWaterA=tmpA,spWaterL=tmpL)
-plot(tmpA)
-plot(tmpL)
-    spWaterA <- rbind_NULLok(spWaterA,tmpA)
-    spWaterL <- rbind_NULLok(spWaterL,tmpL)
-  }
-  
-  if (!is.null(spTown)) plot(spTown)
-  if (!is.null(spRoads)) plot(spRoads)
-  if (!is.null(spWaterA)) plot(spWaterA)
-  if (!is.null(spWaterL)) plot(spWaterL)
-
-  return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
-}
-CAFeatures <- function(CAProvincevec,workProj4) {
-  spTown <- NULL
-  spRoads <- NULL
-  spWaterA <- NULL
-  spWaterL <- NULL
-  ##  files are already filtered for city/road/polygonwater importance
-  for (pr in CAProvincevec) {
-    print(paste0("loading features for ",pr))
-    if (showCities) {
-      tmp <- raster::shapefile(paste0(datadir,"/shapefiles/",pr,
-                                      "Town.shp")) # SpatialPolygonsDF
-      tmp <- sp::spTransform(tmp,workProj4)
-      spTown <- rbind_NULLok(spTown,tmp)
-     }
-    if (showRoads) {
-      tmp <- raster::shapefile(paste0(datadir,"/shapefiles/",pr,
-                                      "Roads.shp")) # SpatialLinesDF
-      tmp <- sp::spTransform(tmp,workProj4)
-      spRoads <- rbind_NULLok(spRoads,tmp)
-    }
-    if (showWater) {
-      tmp <- raster::shapefile(paste0(datadir,"/shapefiles/",pr,
-                                      "WaterA")) # SpatialPolygonsDF
-      tmp <- sp::spTransform(tmp,workProj4)
-      spWaterA <- rbind_NULLok(spWaterA,tmp)
-      tmp <- raster::shapefile(paste0(datadir,"/shapefiles/",pr,
-                                      "WaterL")) # SpatialLinesDF
-      tmp <- sp::spTransform(tmp,workProj4)
-      spWaterL <- rbind_NULLok(spWaterL,tmp)
-    }
-  }
-  if (!is.null(spTown)) plot(spTown, col="PeachPuff")
-  if (!is.null(spRoads)) plot(spRoads)
-  if (!is.null(spWaterA)) plot(spWaterA)
-  if (!is.null(spWaterL)) plot(spWaterL)
-  return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
-}
-writeFeatures <- function(stname,shapefiledir,spTown,spRoads,spWaterA,spWaterL) {
-  print(paste0("writing feature shapefiles for ",stname))
-  raster::shapefile(spRoads,filename=paste0(shapefiledir,"/",stname,"Roads.shp"),
-                    overwrite=TRUE)
-  raster::shapefile(spWaterA,filename=paste0(shapefiledir,"/",stname,"WaterA.shp"),
-                    overwrite=TRUE)
-  raster::shapefile(spWaterL,filename=paste0(shapefiledir,"/",stname,"WaterL.shp"),
-                    overwrite=TRUE)
-  raster::shapefile(spTown,filename=paste0(shapefiledir,"/",stname,"Town.shp"),
-                    overwrite=TRUE)
-  return(NULL)
-}
-filterWaterA <- function(waterLineDF,level="named") {
-  if (level == "named") {
-    tmpkeep <- !is.na(waterLineDF@data[,"NAME"])
-    return(waterLineDF[tmpkeep,])
-  } else if (level=="lakes") {
-    tmpkeep <- waterLineDF@data[,"TYPE"] %in% c("H2030")
-    return(waterLineDF[tmpkeep,])
-  } else if (level=="noarea") {
-    return(NULL)
-  } else {
-    return(waterLineDF)
-  } 
-}
-filterWaterL <- function(waterLineDF,level="area") {
-  waterLineDF <- waterLineDF[waterLineDF$TYPE %in% c("H3010",""),]
-  if (is.null(waterLineDF)) return(NULL)
-  if (level=="area" | level == "lakes") {
-    return(NULL)
-  } else if (level=="all") {
-    return(waterLineDF)
-  } else {
-    tmpname <- waterLineDF@data[,"NAME"]
-    if ((level == "rivers") | (level == "noarea")) {
-      tmpkeep <- grepl("Riv",tmpname)
-    } else if (level == "riversplus") {
-      tmpkeep <- !is.na(tmpname) & 
-        !grepl("Ditch",tmpname) &
-        !grepl("Gulch",tmpname) &
-        !grepl("Cyn",tmpname) &
-        !grepl("Crk",tmpname) &
-        !grepl("Tributary",tmpname) &
-        !grepl("Watercourse",tmpname) &
-        !grepl("Strm",tmpname)
-    } else if (level == "named") {
-      tmpkeep <- !is.na(tmpname)
-    } else {
-      stop("bad value for level in filterWaterL")
-    }
-    return(waterLineDF[tmpkeep,])
-  }
-}
-
 buildFeatureStack <- function(baseLayer,mapshape,
                               spTown,spWaterA,spWaterL,spRoads,
-                              fastAreas=TRUE,
+                              filterVec=c(1,1,1,1),  #towns,roads,waterA,waterL
                               polySimplify=0,polyMethod="vis",
                               polyWeighting=0.85,polySnapInt=0.0001  ) {
-  #  baseRaster a raster, rasterStack or rasterBrick
+  #  baseLayer a rasterLayer
   #  returns a rasterStack  which has 4 layers which can be stored as ints
-  #  - to do - codes for canada
-  
-  tlayer <- raster::raster(nrows=nrow(baseLayer),
-                           ncols=ncol(baseLayer),
-                           ext=extent(baseLayer),
-                           crs=crs(baseLayer),
-                           vals=0)
+
   if (!is.null(spTown)) {
     print("towns")
-    tspTown <- raster::intersect(spTown, tlayer)
+    tspTown <- raster::crop(spTown, baseLayer)
     if (!is.null(tspTown)) {
-      # type is   U pop >= 50k, 2.5k <= C pop < 50k 
-      townlevel = ifelse(tspTown@data[,"TYPE"] %in% c("U","B"),5,3)
       print(paste0(nrow(tspTown)," towns to process"))
-      if (fastAreas) {
-        temp <- rgeos::gUnaryUnion(tspTown)
-        tlayer <- raster::rasterize(temp,tlayer,
-                                    field=townlevel,update=TRUE)
-      } else {
-        print(paste0(nrow(tspTown)," towns to process"))
-        for (i in 1:nrow(tspTown)) {
-          cat("\r",i,"  ",tspTown@data[i,"NAME"],
-                     "                                    ")
-          tlayer <- raster::rasterize(tspTown[i,],tlayer,
-                                    field=townlevel,update=TRUE)
-        }
-        cat("\n")
-      }
-      plot(tspTown,col=citycolor)
+      tspTown$value <- townRank(tspTown@data[,"TYPE"],
+                               tspTown@data[,"NAME"])
+      tspTown <- tspTown[tspTown$value>=filterVec[1],]
+      tlayer <- shapeToRasterLayer(sxdf=tspTown,
+                                   templateRaster=baseLayer,
+                                   polySimplify=polySimplify,
+                                   polyMethod=polyMethod,
+                                   polyWeighting=polyWeighting,
+                                   polySnapInt=polySnapInt)
       if (!is.finite(tlayer@data@min)) {
         warning("tlayer mess-up")
         print(tlayer@data@min)
       }
-      print(paste0(nrow(tspTown)," towns rasterized"))
     } else {
+      tlayer <- raster::raster(nrows=nrow(baseLayer),
+                               ncols=ncol(baseLayer),
+                               ext=extent(baseLayer),
+                               crs=crs(baseLayer),
+                               vals=0)
       print("no towns to add")
     }
   }
-  
-  wAlayer <- raster::raster(nrows=nrow(baseLayer),
-                           ncols=ncol(baseLayer),
-                           ext=extent(baseLayer),
-                           crs=crs(baseLayer),
-                           vals=0)
   if (!is.null(spWaterA)) {
     print("water polygons")
-    tspWaterA <- raster::intersect(spWaterA, wAlayer)
+    tspWaterA <- raster::crop(spWaterA,baseLayer)
     if (!is.null(tspWaterA)) {
-      #  classify the area water by ranking and sort it so higher rank overwrites lower
-      ttype <- tspWaterA@data[,"TYPE"]
-      # type is   H2025=Swamp,H2030=Lake/Pond,H2040=Reservoir,H2041=TreatmentPond,
-      #           H2051=Bay/Est/Sound,H2053=Ocean,H2060=Pit/Quarry,H2081=Glacier
-      #  need field for area of water body
-      rankA <- rep(1,length(ttype))                      # anything here gets at least 1
-      rankA[ttype == "H2081"] <- 6                       # glacier
-      rankA[ttype %in% c("H2053","H2051")] <- 5          # Ocean/Bay/Est/Sound
-      rankA[ttype %in% c("H2025","H2030")] <- 4          # lake/pond/swamp
-      rankA[ttype %in% c("H2025","H2030") &
-            tspWaterA@data[,"size"] < 4000] <- 3         # lake/pond/swamp(<4000 meters2)
-      rankA[ttype %in% c("H2040","H2041","H2060")] <- 2  # res/treatmentpond/pit/quarry
-      tspWaterA$rank <- rankA      
-      tspWaterA <- tspWaterA[order(tspWaterA$rank),]     ### sort it
       print(paste0(nrow(tspWaterA)," water areas to process"))
-      if (fastAreas) {
-        for (i in  sort(unique(rankA))) {
-          print(paste0("rank=",i,"  ", 
-                       nrow(tspWaterA[tspWaterA@data[,"rank"]==i,]),
-                       " areas to process"))
-          temp <- rgeos::gUnaryUnion(tspWaterA[tspWaterA@data[,"rank"]==i,])
-          wAlayer <- raster::rasterize(temp,wAlayer,
-                                       field=i,update=TRUE)
-        }
-        nWaterA <- nrow(tspWaterA)
-      } else {
-        nWaterA <- 0
-        for (i in 1:nrow(tspWaterA)) {
-          if (polySimplify == 0) {
-            temp <- rgeos::gSimplify(tspWaterA[i,],tol=0,topologyPreserve=TRUE)
-          } else {
-            temp <- rmapshaper::ms_simplify(tspWaterA[i,],keep=polySimplify,
-                                            method=polyMethod,
-                                            weighting=polyWeighting,
-                                            snap=TRUE,snap_interval=polySnapInt) 
-            temp <- sp::spTransform(temp,raster::crs(wAlayer))
-          }
-          if (rgeos::gIntersects(temp,mapshape)) {
-            cat("\r",i,"  ",tspWaterA@data[i,"NAME"],
-                       "                                 ")
-            temp <- rgeos::gIntersection(temp,mapshape,drop_lower_td=TRUE)
-            if (!is.null(temp)) {
-              wAlayer <- raster::rasterize(temp,wAlayer,
-                                           field=tspWaterA@data[i,"rank"],update=TRUE)
-              nWaterA <- nWaterA + 1
-            }
-          }
-        }
-        cat("\n")
-      }
-      plot(tspWaterA, col="blue")
+      tspWaterA$value <- waterARank(tspWaterA@data[,"TYPE"],
+                                    tspWaterA@data[,"NAME"],
+                                    tspWaterA@data[,"size"] )      
+      tspWaterA <- tspWaterA[tspWaterA$value>=filterVec[3],]
+      wAlayer <- shapeToRasterLayer(sxdf=tspWaterA,
+                                    templateRaster=baseLayer,
+                                    polySimplify=polySimplify,
+                                    polyMethod=polyMethod,
+                                    polyWeighting=polyWeighting,
+                                    polySnapInt=polySnapInt)
       if (!is.finite(wAlayer@data@min)) {
         warning("wAlayer mess-up")
         print(wAlayer@data@min)
       }
-      print(paste0(nWaterA," water polygons drawn"))
     } else {
+      wAlayer <- raster::raster(nrows=nrow(baseLayer),
+                                ncols=ncol(baseLayer),
+                                ext=extent(baseLayer),
+                                crs=crs(baseLayer),
+                                vals=0)
       print("no water polygons to add")
     }
   }
-  
-  wLlayer <- raster::raster(nrows=nrow(baseLayer),
-                            ncols=ncol(baseLayer),
-                            ext=extent(baseLayer),
-                            crs=crs(baseLayer),
-                            vals=0)
   if (!is.null(spWaterL)) {
-    print(paste0("water lines - ",nrow(spWaterL)))
-    #  classify the linear water by ranking and sort it so higher rank overwrites lower
-    ttype <- spWaterL@data[,"TYPE"]
-    tname <- spWaterL@data[,"NAME"]
-    # type is   H3010=Stream/River,H3013=BraidedStream,H3020=Canal/Ditch
-    rankL <- rep(1,length(ttype))                      # anything here gets a 1
-    rankL[ttype == "H3020"] <- 2                       # canal/ditch
-    rankL[ttype == "H3013"] <- 3                       # H3013 braided stream
-    rankL[ttype == "H3010"] <- 4                       # H3010 stream/river
-    rankL[ttype == "H3010" &
-            grepl("RIV",toupper(tname))] <- 6            # H3010 + name contains "RIV"
-    spWaterL$rank <- rankL      
-
-    for (i in  sort(unique(rankL))) {
-      tspWaterL <- spWaterL[spWaterL$rank == i,]
-      nWaterLi <- nrow(tspWaterL)
-      nWaterLii <- 0
-      for (j in 1:ceiling(nWaterLi/20000)) { 
-        keepidx <- seq((j-1)*20000+1,min(nWaterLi,j*20000),1)
-        ttspWaterL <- tspWaterL[keepidx,]
-        ttspWaterL <- raster::crop(ttspWaterL,wLlayer)
-        if (!is.null(ttspWaterL)) {
-          nWaterLii <- nWaterLii + nrow(ttspWaterL)
-          #temp <- rgeos::gLineMerge(ttspWaterL)
-          temp <- ttspWaterL
-print(system.time(
-          wLlayer <- raster::rasterize(temp,wLlayer,
-                                     field=i,update=TRUE)
-)[3])
-        }
+    print("water lines")
+    tspWaterL <- raster::crop(spWaterL,baseLayer)
+    if (!is.null(tspWaterL)) {
+      print(paste0(nrow(tspWaterL)," water lines to process"))
+      tspWaterL$value <- waterLRank(tspWaterL@data[,"TYPE"],
+                                    tspWaterL@data[,"NAME"] )      
+      tspWaterL <- tspWaterL[tspWaterL$value>=filterVec[4],]
+      wLlayer <- shapeToRasterLayer(sxdf=tspWaterL,
+                                    templateRaster=baseLayer)
+      if (!is.finite(wLlayer@data@min)) {
+        warning("wLlayer mess-up")
+        print(wLlayer@data@min)
       }
-      print(paste0("rank ",i,"  added ",nWaterLii,
-                   " linear water features out of list of ", nWaterLi))
+    } else {
+      wLlayer <- raster::raster(nrows=nrow(baseLayer),
+                                ncols=ncol(baseLayer),
+                                ext=extent(baseLayer),
+                                crs=crs(baseLayer),
+                                vals=0)
+      print("no water lines to add")
     }
-    plot(tspWaterL, col="blue")
-    if (!is.finite(wLlayer@data@min)) {
-      warning("wLlayer mess-up")
-      print(wLlayer@data@min)
-    }
-  } else {
-    print("no water lines to add")
   }
-  
-  rlayer <- raster::raster(nrows=nrow(baseLayer),
-                           ncols=ncol(baseLayer),
-                           ext=extent(baseLayer),
-                           crs=crs(baseLayer),
-                           vals=0)
   if (!is.null(spRoads)) {
     print("roads")
-    tspRoads <- raster::crop(spRoads, rlayer) 
-    if (!is.null(tspRoads)) {
-      nRoads <- nrow(tspRoads)
-      # type is   S1100=secondary   S1200=Primary
-      ttype <- tspRoads@data[,"TYPE"]
-      rankR <- rep(1,length(ttype))                      # anything here gets a 1
-      rankR[ttype == "S1100"] <- 3                       # secondary
-      rankR[ttype == "S1200"] <- 5                       # primary
-      tspRoads$rank <- rankR      
-      for (i in sort(unique(rankR))) {
-        #temp <- rgeos::gLineMerge(tspRoads[tspRoads@data[,"rank"]==i,])
-        temp <- tspRoads[tspRoads@data[,"rank"]==i,]
-        rlayer <- raster::rasterize(temp,rlayer,
-                                    field=i,update=TRUE)
-      }
-      plot(tspRoads)
+    tspRoads <- raster::crop(spRoads,baseLayer)
+    if (!is.null(tspWaterL)) {
+      print(paste0(nrow(tspRoads)," roads to process"))
+      tspRoads$value <- roadRank(tspRoads@data[,"TYPE"],
+                                tspRoads@data[,"NAME"] )      
+      tspRoads <- tspRoads[tspRoads$value>=filterVec[2],]
+      rlayer <- shapeToRasterLayer(sxdf=tspRoads,
+                                   templateRaster=baseLayer)
       if (!is.finite(rlayer@data@min)) {
         warning("rlayer mess-up")
         print(rlayer@data@min)
       }
-      print(paste0(nRoads," roads drawn"))
     } else {
+      rlayer <- raster::raster(nrows=nrow(baseLayer),
+                                ncols=ncol(baseLayer),
+                                ext=extent(baseLayer),
+                                crs=crs(baseLayer),
+                                vals=0)
       print("no roads to add")
     }
   }
@@ -351,3 +111,211 @@ print(system.time(
   names(s) <- c("town","waterA","waterL","road")  
   return(s)
 }
+shapeToRasterLayer <- function(sxdf,templateRaster,
+                               polySimplify=0,polyMethod="vis",
+                               polyWeighting=0.85,polySnapInt=0.0001  ) {
+  # return a rasterLayer based on templateRaster, rasterizing sxdf lines/polygons 
+  #   using values in sxdf@data[,"rank"]
+  zeroRaster <- templateRaster
+  raster::values(zeroRaster) <- 0
+  rlayer <- velox::velox(zeroRaster)
+  sxdf <- raster::crop(sxdf,raster::extent(templateRaster))
+  sxdf <- sxdf[order(sxdf$value),]  #  sort for velox rasterize
+  if (!is.null(sxdf)) {
+    if (class(sxdf)=="SpatialPolygonsDataFrame") {
+      if (polySimplify>0) {
+        sxdf <- rmapshaper::ms_simplify(tspWaterA[i,],keep=polySimplify,
+                                        method=polyMethod,
+                                        weighting=polyWeighting,
+                                        snap=TRUE,snap_interval=polySnapInt) 
+        sxdf <- sp::spTransform(sxdf,raster::crs(templateRaster))
+      }   
+    }
+    print(system.time(
+      rlayer$rasterize(spdf=sxdf,field="value",background=0)
+    )[[3]])
+  } 
+  return(rlayer$as.RasterLayer(band=1))
+}
+townRank <- function(ttype,tname) {
+  ttype <- as.vector(ttype)
+  # for US TIGER data type is   U pop >= 50k, 2.5k <= C pop < 50k 
+  # for Canada type is   B=Metro, K=agglomeration w/tracts, D=agglomeration w/o tracts
+  #    (K is dropped already)
+  rankT <- rep(1,length(ttype))
+  rankT[ttype %in% c("C","D")] <- 3           
+  rankT[ttype %in% c("U","B")] <- 5           
+  return(as.integer(rankT))
+}
+roadRank <- function(rtype,rname) {
+  rtype <- as.vector(rtype)
+  # for US TIGER data type is S1100=secondary   S1200=Primary
+  # for Canada type is from(RANK) 1=transcanada, 2=national, 3=major, 4=secondary hwy
+  rankR <- rep(1,length(rtype))                       # anything here gets a 1
+  rankR[rtype %in% c("S1100","3","4")] <- 3           # secondary
+  rankR[rtype %in% c("S1200","1","2")] <- 5             # primary
+  return(as.integer(rankR))
+}
+waterARank <- function(wtype,wname,wsize) {
+  wtype <- as.vector(wtype)
+  wname <- as.vector(wname)
+  wsize <- as.vector(wsize)
+  # type is   H2025=Swamp,H2030=Lake/Pond,H2040=Reservoir,H2041=TreatmentPond,
+  #           H2051=Bay/Est/Sound,H2053=Ocean,H2060=Pit/Quarry,H2081=Glacier
+  # type is   H3010=Stream/River,H3013=BraidedStream,H3020=Canal/Ditch
+  #           CANADA=from canada files
+  rankA <- rep(1,length(wtype))                      # anything here gets at least 1
+  rankA[wtype %in% c("H2040","H2041","H2060")] <- 2  # res/treatmentpond/pit/quarry
+  rankA[wtype %in% c("H2025","H2030",
+                     "H3010","H3013","H3020",
+                     "CANADA")]                <- 3  # lake/pond/swamp/stream
+  
+  rankA[wtype %in% c("H2040","H2041","H2060",
+                     "H2025","H2030",
+                     "H3010","H3013","H3020",
+                     "CANADA") &
+          wsize >= 1000]                        <- 4 # any of the previous that are not small
+  rankA[wtype %in% c("H2025","H2030",
+                     "H3010","H3013","H3020",
+                     "CANADA") &
+          !is.na(wname)]                        <- 5 # lake/pond/swamp/stream named
+  rankA[wtype %in% c("H2025","H2030",
+                     "H3010","H3013","H3020",
+                     "CANADA") &
+          wsize >= 4000]                        <- 6 # lake/pond/swamp/stream big
+  rankA[wtype %in% c("H2053","H2051")]          <- 7 # Ocean/Bay/Est/Sound
+  rankA[wtype == "H2081"]                       <- 8 # glacier
+  return(as.integer(rankA))
+}
+waterLRank <- function(wtype,wname) {
+  wtype <- as.vector(wtype)
+  wname <- as.vector(wname)
+  #  classify the linear water by ranking and sort it so higher rank overwrites lower
+  # type is   H3010=Stream/River,H3013=BraidedStream,H3020=Canal/Ditch
+  #   H1100 is unspecified, gets  set to 1
+  rankL <- rep(1,length(wtype))               # anything here gets a 1
+  rankL[wtype == "H3020"] <- 2                # canal/ditch
+  rankL[wtype == "H3013"] <- 3                # H3013 braided stream
+  rankL[wtype %in% c("H3010","CANADA")] <- 4  # H3010 stream/river
+  rankL[wtype %in% c("H3010","CANADA") & 
+          !is.na(wname)] <- 5                 # H3010 + name not missing
+  rankL[wtype %in% c("H3010","CANADA") &
+          grepl("RIV",toupper(wname))] <- 6   # H3010 + name contains "RIV"
+  return(as.integer(rankL))
+}
+loadShapeFiles <- function(USStatevec,CAProvincevec,mapcrop,
+                           shapefileDir,writeShapefiles,
+                           shapefileSource="Shapefiles") {
+  workProj4 <- raster::crs(mapcrop)
+  spTown <- NULL
+  spRoads <- NULL
+  spWaterA <- NULL
+  spWaterL <- NULL
+  if (!is.null(USStatevec)) {
+    tmp <- USFeatures(USStatevec=USStatevec,
+                      workProj4=workProj4,
+                      shapefileSource=shapefileSource,
+                      shapefileDir=shapefileDir,
+                      writeShapefiles=writeShapefiles)
+    spTown <- rbind_NULLok(spTown,tmp[["spTown"]])
+    spRoads <- rbind_NULLok(spRoads,tmp[["spRoads"]])
+    spWaterA <- rbind_NULLok(spWaterA,tmp[["spWaterA"]])
+    spWaterL <- rbind_NULLok(spWaterL,tmp[["spWaterL"]])
+  }
+  if (!is.null(CAProvincevec)) {
+    tmp <- CAFeatures(CAProvincevec,workProj4,shapefileDir)
+    spTown <- rbind_NULLok(spTown,tmp[["spTown"]])
+    spRoads <- rbind_NULLok(spRoads,tmp[["spRoads"]])
+    spWaterA <- rbind_NULLok(spWaterA,tmp[["spWaterA"]])
+    spWaterL <- rbind_NULLok(spWaterL,tmp[["spWaterL"]])
+  }
+  spTown <- raster::crop(spTown,mapcrop)
+  spRoads <- raster::crop(spRoads,mapcrop)
+  spWaterA <- raster::crop(spWaterA,mapcrop)
+  spWaterL <- raster::crop(spWaterL,mapcrop)
+  if (!is.null(spTown)) plot(spTown)
+  if (!is.null(spRoads)) plot(spRoads)
+  if (!is.null(spWaterA)) plot(spWaterA)
+  if (!is.null(spWaterL)) plot(spWaterL)
+  return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
+}
+USFeatures <- function(USStatevec,workProj4,
+                       shapefileDir,writeShapefiles,
+                       shapefileSource="TIGER") {
+  spTown <- NULL
+  spRoads <- NULL
+  spWaterA <- NULL
+  spWaterL <- NULL
+  for (st in USStatevec) {
+    if (shapefileSource != "Shapefiles" | 
+        !file.exists(paste0(shapefileDir,"/",st,"Town.shp"))) {
+      tmp <- USTigerFeatures(st,workProj4=workProj4,
+                             shapefileDir=shapefileDir,
+                             writeShapefiles=writeShapefiles)
+    } else {
+      tmp <- readShapeFiles(st,shapefileDir)
+    }
+    spTown <- rbind_NULLok(spTown,tmp[["spTown"]])
+    spRoads <- rbind_NULLok(spRoads,tmp[["spRoads"]])
+    spWaterA <- rbind_NULLok(spWaterA,tmp[["spWaterA"]])
+    spWaterL <- rbind_NULLok(spWaterL,tmp[["spWaterL"]])
+  }   
+  return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
+}
+USTigerFeatures <- function(st,workProj4,
+                            shapefileDir,writeShapefiles=TRUE) {
+  stMask <- sp::spTransform(tigris::counties(st),workProj4)
+    
+  spTown <- sp::spTransform(tigris::urban_areas(),workProj4)
+  spTown <- spTown[,(names(spTown) %in% c("NAME10","UATYP10"))]
+  colnames(spTown@data) <- c("NAME","TYPE")
+  spTown <- sxdfMask(spTown,stMask,keepTouch=TRUE) #keep if town touches the state
+  # type is   U pop >= 50k, 2.5k <= C pop < 50k   
+    
+  spRoads <- sp::spTransform(tigris::primary_secondary_roads(st),workProj4) # SpatialPolygonsDF
+  spRoads <- spRoads[,(names(spRoads) %in% c("FULLNAME","MTFCC"))]
+  colnames(spRoads@data) <- c("NAME","TYPE")  
+  # type is   S1100=secondary   S1200=Primary
+
+  tmpA <- NULL
+  tmpL <- NULL
+  for (c in tigris::list_counties(st)[["county_code"]]) {
+    if (!(c == "515" & st == "VA")) {   #Bedford Town not in data?!?
+      #spatialPolygon dataframe
+      tmpA <- rbind_NULLok(tmpA,
+                           sp::spTransform(tigris::area_water(st,c),workProj4)) 
+      #spatialLines dataframe
+      tmpL <- rbind_NULLok(tmpL,
+                           sp::spTransform(tigris::linear_water(st,c),workProj4)) 
+    }
+  }  
+  tmpA$size <- as.numeric(tmpA$AWATER) + as.numeric(tmpA$ALAND)
+  spWaterA <- tmpA[,(names(tmpA) %in% c("FULLNAME","MTFCC","size"))]
+  colnames(spWaterA@data) <- c("NAME","TYPE","size")  
+  # type is   H2025=Swamp,H2030=Lake/Pond,H2040=Reservoir,H2041=TreatmentPond,
+  #           H2051=Bay/Est/Sound,H2053=Ocean,H2060=Pit/Quarry,H2081=Glacier
+  spWaterL <- tmpL[,(names(tmpL) %in% c("FULLNAME","MTFCC"))]
+  colnames(spWaterL@data) <- c("NAME","TYPE")  
+  # type is   H3010=Stream/River,H3013=BraidedStream,H3020=Canal/Ditch
+  if (writeShapefiles) 
+    writeShapeFiles(st,shapefileDir=shapefileDir,
+                    spTown=spTown,spRoads=spRoads,
+                    spWaterA=spWaterA,spWaterL=spWaterL)
+  return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
+}
+CAFeatures <- function(CAProvincevec,workProj4,shapefileDir) {
+  spTown <- NULL
+  spRoads <- NULL
+  spWaterA <- NULL
+  spWaterL <- NULL
+  ##  files are already filtered for city/road/polygonwater importance
+  for (pr in CAProvincevec) {
+    tmp <- readShapeFiles(pr,shapefileDir)
+    spTown <- rbind_NULLok(spTown,tmp[["spTown"]])
+    spRoads <- rbind_NULLok(spTown,tmp[["spRoads"]])
+    spWaterA <- rbind_NULLok(spTown,tmp[["spWaterA"]])
+    spWaterL <- rbind_NULLok(spTown,tmp[["spWaterL"]])
+  }
+  return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
+}
+

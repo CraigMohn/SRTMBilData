@@ -90,7 +90,8 @@ for (i in 1:length(provlist)) {
   print("starting water area")
   keep <- tmpa@data$PRUID == prid 
   tmpmasked <- tmpa[keep,"NAME"]
-  tmpmasked@data$TYPE <- ""
+  tmpmasked@data$TYPE <- "CANADA"
+  tmpmasked@data$size <- raster::area(tmpmasked)
   plot(tmpmasked)
   raster::shapefile(tmpmasked,filename=paste0(datadir,"/shapefiles/",
                                               pr,"WaterA.shp"),
@@ -98,7 +99,7 @@ for (i in 1:length(provlist)) {
   print("starting water lines")
   keep <- tmpl@data$PRUID == prid 
   tmpmasked <- tmpl[keep,"NAME"]
-  tmpmasked@data$TYPE <- ""
+  tmpmasked@data$TYPE <- "CANADA"
   plot(tmpmasked)
   raster::shapefile(tmpmasked,filename=paste0(datadir,"/shapefiles/",
                                               pr,"WaterL.shp"),
