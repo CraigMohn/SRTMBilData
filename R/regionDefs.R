@@ -31,6 +31,7 @@ expandRegions <- function(invec,country) {
 
 # mapWindow <- c(-159.90,-159.15,21.75,22.35) # Kauai 
 # mapWindow <- c(-156.80,-155.97,20.50,21.05) # Maui
+# mapWindow <- c(-156.10,-154.75,18.85,20.30) # Big Island
 # mapWindow <- c(-158.30,-157.60,21.20,21.75) # Oahu
 # mapWindow <- c(-123,-121.6,46.75,48)        # Seattle Area 
 # mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 

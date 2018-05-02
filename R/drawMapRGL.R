@@ -28,6 +28,8 @@ drawMapRGL <- function(USStatevec=NULL,CAProvincevec=NULL,USParkvec=NULL,
   if (featureDataSource=="Shapefiles" & writeShapefiles)
     stop("don't ask me to read the shapefile data and then write it")
   
+  featureFilter <- c(townLevel,roadLevel,waterALevel,waterLLevel)
+  
   ##  to do:  add list of saved elev/feature rasters
   ##          default mapWindow to user-supplied elev rasters
   ##          handle no feature file found
