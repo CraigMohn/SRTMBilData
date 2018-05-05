@@ -111,7 +111,9 @@ loadMapElevData <- function(mapcrop,mapDataDir,resstr) {
   print("calling merge")
   if (j > 2) {
     #m.sub <- do.call(merge, r.list))
-    m.sub <- do.call(merge, c(r.list,list(tolerance=0.1)))
+    print(system.time(
+      m.sub <- do.call(merge, c(r.list,list(tolerance=0.1)))
+    )[3])  
   } else {
     m.sub <- r.list[[1]]
   }

@@ -48,16 +48,26 @@ resstr <- c("_1arc_v3_bil","_3arc_v2_bil","_1arc_v3_bil")[[mapLibSelector]]
 
 #################################################################################
 
+mapWindow <- NULL
+# mapWindow <- c(-156.80,-155.97,20.50,21.05) # Maui
+# mapWindow <- c(-159.90,-159.15,21.75,22.35) # Kauai 
+# mapWindow <- c(-156.10,-154.75,18.85,20.30) # Big Island
+# mapWindow <- c(-81.4,-80.0,36.8,37.6)       # Giles Cty/Blacksburg Area 
+# mapWindow <- c(-123.25,-121.5,46.75,48)        # Seattle Area 
 
-
-drawMapRGL(USStatevec="OR",
+drawMapRGL(USStatevec="CA",
+           mapWindow=mapWindow,
+           #cropbox=cropbox,
            elevDataSource="SRTM",
-           featureDataSource="Shapefiles",
-           writeElevFile=TRUE,writeFeatureFile=TRUE,
+           featureDataSource="TIGER",
+           writeElevFile=FALSE,
+           writeFeatureFile=TRUE,
            rasterDir=rasterDir,mapDataDir=mapDataDir,
-           shapefileDir=shapefileDir,
-           saveRGL=TRUE,mapoutputdir=mapoutputdir,
-           outputName="OR")
+           shapefileDir=shapefileDir,includeAllRoads=TRUE,
+           saveRGL=TRUE,res3d=2800,
+           mapoutputdir=mapoutputdir,
+           #rasterFileSetWriteNames="SeattleArea",
+           outputName="CA")
 
 
 

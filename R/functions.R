@@ -36,6 +36,13 @@ doubleExtent <- function(objectWithExtent) {
                 min(90,(-bb[2,1]+3*bb[2,2])/2)))
 }
 
+quickmask <- function(r,sp,rectangle=FALSE) {
+  if (rectangle) {
+    return(raster::crop(r,sp))
+  } else {
+    return(raster::mask(r,sp))
+  }
+}
 
 sxdfMask <- function(sxdf,poly,keepTouch=FALSE) {
   

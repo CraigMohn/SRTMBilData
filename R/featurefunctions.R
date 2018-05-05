@@ -5,10 +5,12 @@ buildFeatureStack <- function(baseLayer,mapshape,
                               polyWeighting=0.85,polySnapInt=0.0001  ) {
   #  baseLayer a rasterLayer
   #  returns a rasterStack  which has 4 layers which can be stored as ints
-
+  bLrect <- as(raster::extent(baseLayer), "SpatialPolygons")
+  sp::proj4string(bLrect) <- sp::proj4string(baseLayer)
+  
   if (!is.null(spTown)) {
     print("towns")
-    tspTown <- raster::crop(spTown, baseLayer)
+    tspTown <- sxdfMask(spTown, bLrect)
     if (!is.null(tspTown)) {
       print(paste0(nrow(tspTown)," towns to process"))
       tspTown$value <- townRank(tspTown@data[,"TYPE"],
@@ -35,7 +37,7 @@ buildFeatureStack <- function(baseLayer,mapshape,
   }
   if (!is.null(spWaterA)) {
     print("water polygons")
-    tspWaterA <- raster::crop(spWaterA,baseLayer)
+    tspWaterA <- sxdfMask(spWaterA,bLrect)
     if (!is.null(tspWaterA)) {
       print(paste0(nrow(tspWaterA)," water areas to process"))
       tspWaterA$value <- waterARank(tspWaterA@data[,"TYPE"],
@@ -63,7 +65,7 @@ buildFeatureStack <- function(baseLayer,mapshape,
   }
   if (!is.null(spWaterL)) {
     print("water lines")
-    tspWaterL <- raster::crop(spWaterL,baseLayer)
+    tspWaterL <- sxdfMask(spWaterL,bLrect)
     if (!is.null(tspWaterL)) {
       print(paste0(nrow(tspWaterL)," water lines to process"))
       tspWaterL$value <- waterLRank(tspWaterL@data[,"TYPE"],
@@ -86,8 +88,8 @@ buildFeatureStack <- function(baseLayer,mapshape,
   }
   if (!is.null(spRoads)) {
     print("roads")
-    tspRoads <- raster::crop(spRoads,baseLayer)
-    if (!is.null(tspWaterL)) {
+    tspRoads <- sxdfMask(spRoads,bLrect)
+    if (!is.null(tspRoads)) {
       print(paste0(nrow(tspRoads)," roads to process"))
       tspRoads$value <- roadRank(tspRoads@data[,"TYPE"],
                                 tspRoads@data[,"NAME"] )      
@@ -113,27 +115,39 @@ buildFeatureStack <- function(baseLayer,mapshape,
 }
 shapeToRasterLayer <- function(sxdf,templateRaster,
                                polySimplify=0,polyMethod="vis",
-                               polyWeighting=0.85,polySnapInt=0.0001  ) {
+                               polyWeighting=0.85,polySnapInt=0.0001,
+                               maxShapes=200000) {
   # return a rasterLayer based on templateRaster, rasterizing sxdf lines/polygons 
   #   using values in sxdf@data[,"rank"]
   zeroRaster <- templateRaster
   raster::values(zeroRaster) <- 0
   rlayer <- velox::velox(zeroRaster)
-  sxdf <- raster::crop(sxdf,raster::extent(templateRaster))
-  sxdf <- sxdf[order(sxdf$value),]  #  sort for velox rasterize
+  #sxdf <- raster::crop(sxdf,raster::extent(templateRaster))
+  #sxdf <- raster::intersect(sxdf,
+                        #    as(raster::extent(templateRaster),'SpatialPolygons'))
+  CP <- as(extent(templateRaster), "SpatialPolygons")
+  sp::proj4string(CP) <- CRS(sp::proj4string(templateRaster))
+  sxdf <- sxdfMask(sxdf,CP) 
   if (!is.null(sxdf)) {
+    sxdf <- sxdf[order(sxdf$value),]  #  sort for velox rasterize
     if (class(sxdf)=="SpatialPolygonsDataFrame") {
       if (polySimplify>0) {
-        sxdf <- rmapshaper::ms_simplify(tspWaterA[i,],keep=polySimplify,
+        sxdf <- rmapshaper::ms_simplify(sxdf,keep=polySimplify,
                                         method=polyMethod,
                                         weighting=polyWeighting,
                                         snap=TRUE,snap_interval=polySnapInt) 
         sxdf <- sp::spTransform(sxdf,raster::crs(templateRaster))
       }   
     }
-    print(system.time(
-      rlayer$rasterize(spdf=sxdf,field="value",background=0)
-    )[[3]])
+    nchunks <- ceiling(nrow(sxdf)/maxShapes)
+    for ( i in 1:nchunks ) {
+      gc()        #  cleanup, this takes a lot of memory
+      upperlimit <- min(i*maxShapes,nrow(sxdf))
+      tsxdf <- sxdf[((i-1)*maxShapes+1):upperlimit,]
+      print(system.time(
+        rlayer$rasterize(spdf=tsxdf,field="value",background=0)
+      )[[3]])
+    }
   } 
   return(rlayer$as.RasterLayer(band=1))
 }
@@ -152,6 +166,7 @@ roadRank <- function(rtype,rname) {
   # for US TIGER data type is S1100=secondary   S1200=Primary
   # for Canada type is from(RANK) 1=transcanada, 2=national, 3=major, 4=secondary hwy
   rankR <- rep(1,length(rtype))                       # anything here gets a 1
+  rankR[rtype %in% c("S1400","S1640","S1820")] <- 2   # Local Street,Service Drive, Bike Path
   rankR[rtype %in% c("S1100","3","4")] <- 3           # secondary
   rankR[rtype %in% c("S1200","1","2")] <- 5             # primary
   return(as.integer(rankR))
@@ -205,7 +220,8 @@ waterLRank <- function(wtype,wname) {
 }
 loadShapeFiles <- function(USStatevec,CAProvincevec,mapcrop,
                            shapefileDir,writeShapefiles,
-                           shapefileSource="Shapefiles") {
+                           shapefileSource="Shapefiles",
+                           includeAllRoads=FALSE) {
   workProj4 <- raster::crs(mapcrop)
   spTown <- NULL
   spRoads <- NULL
@@ -216,7 +232,8 @@ loadShapeFiles <- function(USStatevec,CAProvincevec,mapcrop,
                       workProj4=workProj4,
                       shapefileSource=shapefileSource,
                       shapefileDir=shapefileDir,
-                      writeShapefiles=writeShapefiles)
+                      writeShapefiles=writeShapefiles,
+                      includeAllRoads=includeAllRoads)
     spTown <- rbind_NULLok(spTown,tmp[["spTown"]])
     spRoads <- rbind_NULLok(spRoads,tmp[["spRoads"]])
     spWaterA <- rbind_NULLok(spWaterA,tmp[["spWaterA"]])
@@ -229,19 +246,16 @@ loadShapeFiles <- function(USStatevec,CAProvincevec,mapcrop,
     spWaterA <- rbind_NULLok(spWaterA,tmp[["spWaterA"]])
     spWaterL <- rbind_NULLok(spWaterL,tmp[["spWaterL"]])
   }
-  spTown <- raster::crop(spTown,mapcrop)
-  spRoads <- raster::crop(spRoads,mapcrop)
-  spWaterA <- raster::crop(spWaterA,mapcrop)
-  spWaterL <- raster::crop(spWaterL,mapcrop)
-  if (!is.null(spTown)) plot(spTown)
-  if (!is.null(spRoads)) plot(spRoads)
-  if (!is.null(spWaterA)) plot(spWaterA)
-  if (!is.null(spWaterL)) plot(spWaterL)
+  #  Don't need to check boundaries - 
+  #   saved chunks were appropriately masked/filtered and 
+  #   TIGER is masked if needed when fetched
+  #   canada data was categorized when shapefiles were created
   return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
 }
 USFeatures <- function(USStatevec,workProj4,
                        shapefileDir,writeShapefiles,
-                       shapefileSource="TIGER") {
+                       shapefileSource="TIGER",
+                       includeAllRoads=FALSE) {
   spTown <- NULL
   spRoads <- NULL
   spWaterA <- NULL
@@ -251,9 +265,10 @@ USFeatures <- function(USStatevec,workProj4,
         !file.exists(paste0(shapefileDir,"/",st,"Town.shp"))) {
       tmp <- USTigerFeatures(st,workProj4=workProj4,
                              shapefileDir=shapefileDir,
-                             writeShapefiles=writeShapefiles)
+                             writeShapefiles=writeShapefiles,
+                             includeAllRoads=includeAllRoads)
     } else {
-      tmp <- readShapeFiles(st,shapefileDir)
+      tmp <- readShapeFiles(st,shapefileDir,workProj4)
     }
     spTown <- rbind_NULLok(spTown,tmp[["spTown"]])
     spRoads <- rbind_NULLok(spRoads,tmp[["spRoads"]])
@@ -263,7 +278,8 @@ USFeatures <- function(USStatevec,workProj4,
   return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
 }
 USTigerFeatures <- function(st,workProj4,
-                            shapefileDir,writeShapefiles=TRUE) {
+                            shapefileDir,writeShapefiles=TRUE,
+                            includeAllRoads=FALSE) {
   stMask <- sp::spTransform(tigris::counties(st),workProj4)
     
   spTown <- sp::spTransform(tigris::urban_areas(),workProj4)
@@ -272,11 +288,12 @@ USTigerFeatures <- function(st,workProj4,
   spTown <- sxdfMask(spTown,stMask,keepTouch=TRUE) #keep if town touches the state
   # type is   U pop >= 50k, 2.5k <= C pop < 50k   
     
-  spRoads <- sp::spTransform(tigris::primary_secondary_roads(st),workProj4) # SpatialPolygonsDF
-  spRoads <- spRoads[,(names(spRoads) %in% c("FULLNAME","MTFCC"))]
-  colnames(spRoads@data) <- c("NAME","TYPE")  
+  # spRoads <- sp::spTransform(tigris::primary_secondary_roads(st),workProj4) # SpatialPolygonsDF
+  # spRoads <- spRoads[,(names(spRoads) %in% c("FULLNAME","MTFCC"))]
+  # colnames(spRoads@data) <- c("NAME","TYPE")  
   # type is   S1100=secondary   S1200=Primary
 
+  tmpR <- NULL
   tmpA <- NULL
   tmpL <- NULL
   for (c in tigris::list_counties(st)[["county_code"]]) {
@@ -287,6 +304,8 @@ USTigerFeatures <- function(st,workProj4,
       #spatialLines dataframe
       tmpL <- rbind_NULLok(tmpL,
                            sp::spTransform(tigris::linear_water(st,c),workProj4)) 
+      tmpR <- rbind_NULLok(tmpR,
+                           sp::spTransform(tigris::roads(st,c),workProj4)) 
     }
   }  
   tmpA$size <- as.numeric(tmpA$AWATER) + as.numeric(tmpA$ALAND)
@@ -294,9 +313,19 @@ USTigerFeatures <- function(st,workProj4,
   colnames(spWaterA@data) <- c("NAME","TYPE","size")  
   # type is   H2025=Swamp,H2030=Lake/Pond,H2040=Reservoir,H2041=TreatmentPond,
   #           H2051=Bay/Est/Sound,H2053=Ocean,H2060=Pit/Quarry,H2081=Glacier
+
   spWaterL <- tmpL[,(names(tmpL) %in% c("FULLNAME","MTFCC"))]
   colnames(spWaterL@data) <- c("NAME","TYPE")  
   # type is   H3010=Stream/River,H3013=BraidedStream,H3020=Canal/Ditch
+  
+  spRoads <- tmpR[,(names(tmpR) %in% c("FULLNAME","MTFCC"))]
+  colnames(spRoads@data) <- c("NAME","TYPE")  
+  # type is   S1100=Primary        S1200=Secondary      S1400=Local St 
+  #           S1500=Vehicular Trl  S1630=Ramp           S1640=Service Drive 
+  #           S1710=Walkway        S1720=Stairway       S1730=Alley
+  #           S1740=Private Rd     S1750=Internal       S1780=Pkgng Lot 
+  #           S1820=Bike Path      S1830=Bridle Trl
+  
   if (writeShapefiles) 
     writeShapeFiles(st,shapefileDir=shapefileDir,
                     spTown=spTown,spRoads=spRoads,
@@ -310,7 +339,7 @@ CAFeatures <- function(CAProvincevec,workProj4,shapefileDir) {
   spWaterL <- NULL
   ##  files are already filtered for city/road/polygonwater importance
   for (pr in CAProvincevec) {
-    tmp <- readShapeFiles(pr,shapefileDir)
+    tmp <- readShapeFiles(pr,shapefileDir,workProj4)
     spTown <- rbind_NULLok(spTown,tmp[["spTown"]])
     spRoads <- rbind_NULLok(spTown,tmp[["spRoads"]])
     spWaterA <- rbind_NULLok(spTown,tmp[["spWaterA"]])

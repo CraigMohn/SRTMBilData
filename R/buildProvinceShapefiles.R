@@ -91,7 +91,9 @@ for (i in 1:length(provlist)) {
   keep <- tmpa@data$PRUID == prid 
   tmpmasked <- tmpa[keep,"NAME"]
   tmpmasked@data$TYPE <- "CANADA"
-  tmpmasked@data$size <- raster::area(tmpmasked)
+  tmpsize <- raster::area(tmpmasked)
+  tmpsize[tmpsize>10000000] <- 10000000
+  tmpmasked@data$size <- tmpsize
   plot(tmpmasked)
   raster::shapefile(tmpmasked,filename=paste0(datadir,"/shapefiles/",
                                               pr,"WaterA.shp"),
