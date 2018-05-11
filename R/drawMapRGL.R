@@ -1,15 +1,15 @@
 drawMapRGL <- function(USStatevec=NULL,CAProvincevec=NULL,USParkvec=NULL,
                        worldCountryvec=NULL,mapWindow=NULL,
                        routeSL=NULL,cropbox=NULL,
-                       res3dplot=2800,maxElev=3000,vScale=1.5,
-                       townLevel=3,roadLevel=3,waterALevel=4,waterLLevel=5,
+                       res3dplot=2500,maxElev=3000,vScale=1.5,
+                       townLevel=3,roadLevel=4,waterALevel=4,waterLLevel=5,
                        rglColorScheme="default",
                        rglNAcolor="Blue",rglNegcolor="Red",
-                       citycolor="Magenta",watercolor="Blue",
+                       citycolor="SlateGray",watercolor="Blue",
                        roadcolor="Black",glaciercolor="White",
                        drawRGL=TRUE,
                        saveRGL=FALSE,mapoutputdir=NULL,outputName=NULL,
-                       workProj4="+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs",
+                       workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
                        elevDataSource="Raster",useRasterFileSets=NULL,
                        rasterFileSetNames=NULL,rasterFileSetWriteNames=NULL,
                        featureDataSource="Shapefiles",
@@ -18,16 +18,20 @@ drawMapRGL <- function(USStatevec=NULL,CAProvincevec=NULL,USParkvec=NULL,
                        rasterDir=NULL,mapDataDir=NULL,shapefileDir=NULL,parkdir=NULL,
                        resstr="_1arc_v3_bil",
                        mapbuffer=0,mapmergebuffer=0,
-                       maxrastercells=500000000,
+                       maxrastercells=200000000,
                        polySimplify=0.0,polyMethod="vis", 
                        polyWeighting=0.85,polySnapInt=0.0001) {
 
   if (elevDataSource=="Raster" & writeElevFile &
-           is.null(rasterFileSetWriteNames))
-    stop("don't ask me to read the raster elevation data and then write it")
+           is.null(rasterFileSetWriteNames)) {
+    warning("will not overwrite elev rasterfile that was source")
+    writeElevFile <- FALSE
+  }
   if (featureDataSource=="Raster" & writeFeatureFile &
-           is.null(rasterFileSetWriteNames))
-    stop("don't ask me to read the raster feature data and then write it")
+           is.null(rasterFileSetWriteNames)){
+    warning("will not overwrite feature rasterfile that was source")
+    writeFeatureFile <- FALSE
+  }
 
   featureFilter <- c(townLevel,roadLevel,waterALevel,waterLLevel)
   
@@ -68,24 +72,27 @@ drawMapRGL <- function(USStatevec=NULL,CAProvincevec=NULL,USParkvec=NULL,
       savedNameVec <- statesInMap
     }
     elevations <- loadSavedElevData(savedNameVec=savedNameVec,
-                                    rasterDir=rasterDir)  %>%
-                  raster::crop(.,mapcrop)
+                                    rasterDir=rasterDir) 
+    if (!is.null(mapWindow))
+        elevations <- quickmask(elevations,mapcrop,rectangle=mapRectangle)
   }  else {
     elevations <- loadMapElevData(mapcrop=mapcrop,
                                   mapDataDir=mapDataDir,resstr=resstr)
+    #  data loaded from SRTM files is masked
   }
+  
   if (writeElevFile) {
     if (!is.null(rasterFileSetWriteNames)) {
       fname <- rasterFileSetWriteNames
     } else {
       fname <- paste0(statesInMap,collapse="")
     }
-    elevations <- quickmask(elevations,mapcrop,rectangle=mapRectangle)
     writeElevRaster(elevations,maxrastercells,rasterDir,
                                      fname=fname)
   }
   ##  Elevation data set up, now load feature raster or at least get shapefiles ready
   ##
+  
   featureStack <- NULL
   if (featureDataSource=="Raster") {
     if (!is.null(rasterFileSetNames)) {
@@ -115,7 +122,6 @@ drawMapRGL <- function(USStatevec=NULL,CAProvincevec=NULL,USParkvec=NULL,
     spWaterA <- NULL
     spWaterL <- NULL
   }
-  
   if (writeFeatureFile) { 
     if (!is.null(rasterFileSetWriteNames)) {
       fname <- rasterFileSetWriteNames
@@ -142,9 +148,8 @@ drawMapRGL <- function(USStatevec=NULL,CAProvincevec=NULL,USParkvec=NULL,
     names(elevations[[1]]) <- "elevations"
   }
 
-  # crop raster now since it's relatively fast
-  elevations <- raster::crop(elevations,mapcrop)
-  
+  # raster(s) already masked by now
+
   print(paste0(elevations@ncols," columns by ",elevations@nrows," rows"))
   sfact <- ceiling(sqrt(elevations@ncols*elevations@nrows/(res3dplot*res3dplot)))
   print(paste0("scaling raster down by a factor of ",sfact))
@@ -166,11 +171,10 @@ drawMapRGL <- function(USStatevec=NULL,CAProvincevec=NULL,USParkvec=NULL,
     elevations <- raster::addLayer(elevations,featureStack)
     names(elevations[[1]]) <- "elevations"
   }  
-  # mask raster after aggregation for speed
-  elevations <- quickmask(elevations,mapcrop,rectangle=mapRectangle)
- 
+  plot(elevations[["road"]])
+  plot(elevations[["waterA"]])
   if (drawRGL)
-    draw3DMapRoute(mapRaster=elevations,
+    draw3DMapTrack(mapRaster=elevations,
                    featureLevels=featureFilter, #towns,roads,waterA,waterL
                    maxElev=maxElev,vScale=vScale,
                    colors=rglColorScheme,

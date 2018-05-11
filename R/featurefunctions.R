@@ -6,8 +6,7 @@ buildFeatureStack <- function(baseLayer,mapshape,
   #  baseLayer a rasterLayer
   #  returns a rasterStack  which has 4 layers which can be stored as ints
   bLrect <- as(raster::extent(baseLayer), "SpatialPolygons")
-  sp::proj4string(bLrect) <- sp::proj4string(baseLayer)
-  
+  sp::proj4string(bLrect) <- sp::proj4string(spTown)
   if (!is.null(spTown)) {
     print("towns")
     tspTown <- sxdfMask(spTown, bLrect)
@@ -115,18 +114,16 @@ buildFeatureStack <- function(baseLayer,mapshape,
 }
 shapeToRasterLayer <- function(sxdf,templateRaster,
                                polySimplify=0,polyMethod="vis",
-                               polyWeighting=0.85,polySnapInt=0.0001,
-                               maxShapes=200000) {
+                               polyWeighting=0.85,polySnapInt=0.0001) {
   # return a rasterLayer based on templateRaster, rasterizing sxdf lines/polygons 
   #   using values in sxdf@data[,"rank"]
   zeroRaster <- templateRaster
   raster::values(zeroRaster) <- 0
   rlayer <- velox::velox(zeroRaster)
-  #sxdf <- raster::crop(sxdf,raster::extent(templateRaster))
   #sxdf <- raster::intersect(sxdf,
                         #    as(raster::extent(templateRaster),'SpatialPolygons'))
   CP <- as(extent(templateRaster), "SpatialPolygons")
-  sp::proj4string(CP) <- CRS(sp::proj4string(templateRaster))
+  sp::proj4string(CP) <- CRS(sp::proj4string(sxdf))
   sxdf <- sxdfMask(sxdf,CP) 
   if (!is.null(sxdf)) {
     sxdf <- sxdf[order(sxdf$value),]  #  sort for velox rasterize
@@ -139,15 +136,10 @@ shapeToRasterLayer <- function(sxdf,templateRaster,
         sxdf <- sp::spTransform(sxdf,raster::crs(templateRaster))
       }   
     }
-    nchunks <- ceiling(nrow(sxdf)/maxShapes)
-    for ( i in 1:nchunks ) {
-      gc()        #  cleanup, this takes a lot of memory
-      upperlimit <- min(i*maxShapes,nrow(sxdf))
-      tsxdf <- sxdf[((i-1)*maxShapes+1):upperlimit,]
-      print(system.time(
-        rlayer$rasterize(spdf=tsxdf,field="value",background=0)
-      )[[3]])
-    }
+    gc()        #  cleanup, this takes a lot of memory
+    print(system.time(
+      rlayer$rasterize(spdf=sxdf,field="value",background=0)
+    )[[3]])
   } 
   return(rlayer$as.RasterLayer(band=1))
 }
@@ -165,10 +157,11 @@ roadRank <- function(rtype,rname) {
   rtype <- as.vector(rtype)
   # for US TIGER data type is S1100=secondary   S1200=Primary
   # for Canada type is from(RANK) 1=transcanada, 2=national, 3=major, 4=secondary hwy
-  rankR <- rep(1,length(rtype))                       # anything here gets a 1
-  rankR[rtype %in% c("S1400","S1640","S1820")] <- 2   # Local Street,Service Drive, Bike Path
-  rankR[rtype %in% c("S1100","3","4")] <- 3           # secondary
-  rankR[rtype %in% c("S1200","1","2")] <- 5             # primary
+  rankR <- rep(1,length(rtype))               # anything here gets a 1
+  rankR[rtype %in% c("S1640","S1820")] <- 2   # Service Drive, Bike Path
+  rankR[rtype %in% c("S1400")]         <- 3   # Local Street
+  rankR[rtype %in% c("S1100","3","4")] <- 4   # secondary
+  rankR[rtype %in% c("S1200","1","2")] <- 5   # primary
   return(as.integer(rankR))
 }
 waterARank <- function(wtype,wname,wsize) {

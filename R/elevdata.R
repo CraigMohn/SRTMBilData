@@ -22,8 +22,6 @@ source("C:/bda/SRTMBilData/R/regionDefs.R")
 
 mapLibSelector <- 1  # 1=northAmerica+NE Pacific 1s, 2=Europe 3s, 3=Australia 3s
 
-#mapWindow <- c(-122.5,-121.9,37.6,38.1)     # East Bay 
-#mapWindow <- c(-122.7,-121.8,37.0,38.3)     # SF Bay
 #USStatevec <- c("WA") #  c("MountainWest","CA","NM","AZ")
 #USParkvec <- c("CANY","CEBR","BRCA","ARCH") 
 #CAProvincevec <- "BC" # c("BC","AB","SK")
@@ -42,7 +40,7 @@ shapefileDir <- paste0(datadir,"/shapefiles")
 mapoutputdir <- "c:/bda/maps3d"            #  map file output location
 NAmericaDataDir <- "c:/bda/NorthAmerica"   #  zip file input subdirectories location
 EuropeDataDir <- "c:/bda/Europe 3s"        #  zip file input subdirectories location
-AustraliaDataDir <- "c:/bda/Australia 3s"        #  zip file input subdirectories location
+AustraliaDataDir <- "c:/bda/Australia 3s"  #  zip file input subdirectories location
 mapDataDir <- c(NAmericaDataDir,EuropeDataDir,AustraliaDataDir)[[mapLibSelector]]
 resstr <- c("_1arc_v3_bil","_3arc_v2_bil","_1arc_v3_bil")[[mapLibSelector]]
 
@@ -53,21 +51,25 @@ mapWindow <- NULL
 # mapWindow <- c(-159.90,-159.15,21.75,22.35) # Kauai 
 # mapWindow <- c(-156.10,-154.75,18.85,20.30) # Big Island
 # mapWindow <- c(-81.4,-80.0,36.8,37.6)       # Giles Cty/Blacksburg Area 
-# mapWindow <- c(-123.25,-121.5,46.75,48)        # Seattle Area 
+# mapWindow <- c(-123.25,-121.5,46.75,48.1)   # Seattle Area 
+# mapWindow <- c(-123.2,-122.4,48.3,48.8)     # San Juans
+ mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 
 
-drawMapRGL(USStatevec="CA",
+drawMapRGL(USStatevec="WA",
            mapWindow=mapWindow,
            #cropbox=cropbox,
-           elevDataSource="SRTM",
-           featureDataSource="TIGER",
-           writeElevFile=FALSE,
+           elevDataSource="Raster",
+           featureDataSource="Raster",
+           townLevel=9,roadLevel=2,waterALevel=4,waterLLevel=5,
+           vScale=2.0,
+           writeElevFile=TRUE,
            writeFeatureFile=TRUE,
            rasterDir=rasterDir,mapDataDir=mapDataDir,
            shapefileDir=shapefileDir,includeAllRoads=TRUE,
-           saveRGL=TRUE,res3d=2800,
+           maxrastercells=200000000,saveRGL=TRUE,res3d=2500,
            mapoutputdir=mapoutputdir,
-           #rasterFileSetWriteNames="SeattleArea",
-           outputName="CA")
+           rasterFileSetWriteNames="SammamishArea",
+           outputName="SammamishArea")
 
 
 

@@ -49,12 +49,11 @@ sxdfMask <- function(sxdf,poly,keepTouch=FALSE) {
   #  return NULL if a) either is NULL or b) no overlap
   #  horrible multiple returns, but....
   if (is.null(sxdf) | is.null(poly)) return(NULL) 
-  
   tmpdata <- sxdf@data
   tmp.1 <- rgeos::gIntersects(sxdf, poly, byid=TRUE)
   tmp.2 <- as.logical(apply(tmp.1, 2, function(x) {sum(x)} ))
   if (sum(tmp.2) == 0) return(NULL)
-  
+
   #  keep only intersecting sp objects in dataframe
   tmpgeo <- sxdf[tmp.2,]
   tmpdata <- tmpdata[tmp.2,]

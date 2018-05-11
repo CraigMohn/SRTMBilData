@@ -1,11 +1,14 @@
-draw3DMapRoute <- function(mapRaster,routeSL=NULL,
+draw3DMapTrack <- function(mapRaster,trackdf=NULL,
                            featureLevels=c(3,3,2,5), #towns,roads,waterA,waterL
                            maxElev=3000,vScale=1.5,
                            colors="default",
                            citycolor="White",roadcolor="Black",
                            watercolor="Blue",glaciercolor="White",
                            rglNAcolor="Blue",rglNegcolor=NA,
-                           saveRGL=FALSE,mapoutputdir=NA,outputName="most recent") {
+                           trackcolor="Magenta",trackCurve=FALSE,
+                           trackCurveElevFromRaster=TRUE,trackCurveHeight=10,
+                           saveRGL=FALSE,mapoutputdir=NA,
+                           outputName="most recent") {
 
   if (class(mapRaster)=="RasterLayer") {
     elevations <- mapRaster
@@ -58,6 +61,34 @@ draw3DMapRoute <- function(mapRaster,routeSL=NULL,
     col[ road >= featureLevels[2] ] <- gplots::col2hex(roadcolor)
     road <- NULL
   }
+  if (!is.null(trackdf)) {
+    if (!trackCurve) {
+      cellnum <- cellFromXY(mapRaster,cbind(trackdf$lon,trackdf$lat))
+      col[cellnum] <- trackcolor
+    } else {
+      xmin <- raster::extent(mapRaster)[1]
+      xmax <- raster::extent(mapRaster)[2]
+      xmin <- raster::extent(mapRaster)[3]
+      xmax <- raster::extent(mapRaster)[4]
+      xlen <-
+        (raster::pointDistance(cbind(xmin,ymin),cbind(xmax,ymin),lonlat=TRUE) +
+           raster::pointDistance(cbind(xmin,ymax),cbind(xmax,ymax),lonlat=TRUE)) /
+        2
+      ylen <-
+        (raster::pointDistance(cbind(xmin,ymin),cbind(xmin,ymax),lonlat=TRUE) +
+           raster::pointDistance(cbind(xmax,ymin),cbind(xmax,ymax),lonlat=TRUE)) /
+        2
+      
+      xpath <- xlen * (1 - (trackdf$lat-ymin)/(ymax-ymin))
+      ypath <- ylen * (trackdf$lon-xmin)/(xmax-xmin)
+      if (trackCurveElevFromRaster)  {
+        zpath <- raster::extract(mapRaster,cbind(trackdf$lon,trackdf$lat),
+                             method="bilinear") +  trackCurveHeight
+      } else {
+        zpath <- trackdf$altitude.m  +  trackCurveHeight
+      }
+    }
+  }
   
   #  and output the graph using rgl
   rgl::par3d("windowRect"= c(100,100,1200,1000))
@@ -72,6 +103,11 @@ draw3DMapRoute <- function(mapRaster,routeSL=NULL,
                  viewpoint.rel=TRUE, specular="black")
   rgl::rgl.viewpoint(userMatrix=userMatrix,type="modelviewpoint")
   pan3d(2)  # right button for panning, doesn't play well with zoom)
+  if (!is.null(trackdf) & trackCurve) {
+    rgl::lines3d(xpath,ypath,zpath,
+                 lwd=2,col = trackcolor, alpha=1.0)
+    
+  }
   if (saveRGL) 
     rgl::writeWebGL(dir=paste0(mapoutputdir), 
                     filename=paste0(mapoutputdir,"/",outputName," rgl map.html"))
