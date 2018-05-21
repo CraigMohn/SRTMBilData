@@ -1,4 +1,3 @@
-
 bufferUnion <- function(spObj,mapbuffer,mapunion,
                         outCRS="+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs",
                         bufferCRS="+init=epsg:3857",
@@ -19,15 +18,15 @@ bufferUnion <- function(spObj,mapbuffer,mapunion,
     return(rgeos::gUnaryUnion(raster::union(mapunion,spObj)))
   } 
 }
-
 rbind_NULLok <- function(a,b) {
   if (is.null(a)) {
     return(b)
+  } else if (is.null(b)) {
+    return(a)
   } else {
     return(rbind(a,b))
   }
 }
-
 doubleExtent <- function(objectWithExtent) {
   bb <- sp::bbox(objectWithExtent)
   return(extent(max(-180,(3*bb[1,1]-bb[1,2])/2),
@@ -35,7 +34,6 @@ doubleExtent <- function(objectWithExtent) {
                 max(-90,(3*bb[2,1]-bb[2,2])/2),
                 min(90,(-bb[2,1]+3*bb[2,2])/2)))
 }
-
 quickmask <- function(r,sp,rectangle=FALSE) {
   if (rectangle) {
     return(raster::crop(r,sp))
@@ -43,7 +41,6 @@ quickmask <- function(r,sp,rectangle=FALSE) {
     return(raster::mask(r,sp))
   }
 }
-
 sxdfMask <- function(sxdf,poly,keepTouch=FALSE) {
   
   #  return NULL if a) either is NULL or b) no overlap
@@ -68,7 +65,6 @@ sxdfMask <- function(sxdf,poly,keepTouch=FALSE) {
     stop(" sxdfMask expects a spatialLinesDataFrame or a spatialPolygonsDataFrame")
   }
 }
-
 shapes_for_states <- function(statevec,
                               workProj4="+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs",
                               shapefiledir="c:/bda/shapefiles") {

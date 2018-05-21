@@ -9,14 +9,14 @@ mapMask <- function(USStatevec=NULL,CAProvincevec=NULL,
       is.null(USParkvec)&is.null(worldCountryvec)&is.null(mapWindow))
     stop(paste0("nothing specified for map"))
 
-  mapcrop <- NULL
+  mapshape <- NULL
   if (!is.null(USStatevec)) {
     USStatevec <- expandRegions(unique(toupper(USStatevec)),"US")  # US State abbrev all upper case
     mcrop <- tigris::counties(USStatevec) %>% 
              rgeos::gUnaryUnion(.) %>% 
              sp::spTransform(.,sp::CRS(workProj4))
     ## tigris returns a SpatialPolgonsDF and gUnaryUnion returns a SpatialPolygons
-    mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop)
+    mapshape <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapshape)
   }
   if (!is.null(CAProvincevec)) {
     CAProvincevec <- expandRegions(unique(toupper(CAProvincevec)),"CANADA")
@@ -25,7 +25,7 @@ mapMask <- function(USStatevec=NULL,CAProvincevec=NULL,
     mcrop <- canada[canada$HASC_1 %in% paste0("CA.",CAProvincevec),] %>%
     rgeos::gUnaryUnion(.)
     # simplify - BC coast is extremely complex
-    mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop,simplifytol = 1) 
+    mapshape <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapshape,simplifytol = 1) 
   }
   if (!is.null(USParkvec)) {
     USParkvec <- unique(toupper(USParkvec))
@@ -39,7 +39,7 @@ mapMask <- function(USStatevec=NULL,CAProvincevec=NULL,
     parkareas <-  sp::spTransform(parkareas[parkareas$UNIT_CODE %in% USParkvec,"geometry"],
                                   sp::CRS(workProj4)) 
     mcrop <- as(parkareas, "Spatial")  
-    mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop) 
+    mapshape <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapshape) 
   }
   if (!is.null(worldCountryvec)) { 
     worldCountryvec <- unique(toupper(worldCountryvec))
@@ -54,15 +54,15 @@ mapMask <- function(USStatevec=NULL,CAProvincevec=NULL,
         mcrop<- rgeos::gUnaryUnion(raster::union(mcrop,cmap))
       }
     }
-    mapcrop <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapcrop,simplifytol = 1)
+    mapshape <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapshape,simplifytol = 1)
   }
   ## mapWindow - overwrite the map used for cropping, 
   ##     but not the list of states/provinces to load
   if (!is.null(mapWindow)) {
-    mapcrop <- raster::extent(mapWindow)
-    CP <- as(mapcrop, "SpatialPolygons")
+    mapshape <- raster::extent(mapWindow)
+    CP <- as(mapshape, "SpatialPolygons")
     sp::proj4string(CP) <- workProj4
-    mapcrop <- rgeos::gUnaryUnion(CP)
+    mapshape <- rgeos::gUnaryUnion(CP)
   }
-  return(bufferUnion(mapcrop,mapbuffer=mapbuffer,NULL,simplifytol = 0))
+  return(bufferUnion(mapshape,mapbuffer=mapbuffer,NULL,simplifytol = 0))
 }

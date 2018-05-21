@@ -29,21 +29,22 @@ expandRegions <- function(invec,country) {
 # cropbox <- raster::extent(-172,-160.25, -18.9, 40) # hawaii NW only
 
 
-# mapWindow <- c(-159.90,-159.15,21.75,22.35) # Kauai 
-# mapWindow <- c(-156.80,-155.97,20.50,21.05) # Maui
-# mapWindow <- c(-156.10,-154.75,18.85,20.30) # Big Island
-# mapWindow <- c(-158.30,-157.60,21.20,21.75) # Oahu
+# mapWindow <- c(-159.90,-159.15,21.75,22.35) # Kauai -purple
+# mapWindow <- c(-156.80,-155.97,20.50,21.05) # Maui - magenta
+# mapWindow <- c(-156.10,-154.75,18.85,20.30) # Big Island - red
+# mapWindow <- c(-158.30,-157.60,21.20,21.75) # Oahu - gold
+
 # mapWindow <- c(-123,-121.6,46.75,48.1)      # Seattle Area 
 # mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 
 # mapWindow <- c(-122.4,-122.1,47.5,47.8)     # Lake Wash Area 
 # mapWindow <- c(-123.2,-122.4,48.3,48.8)     # San Juans
+
 # mapWindow <- c(-122.5,-121.9,37.6,38.1)     # East Bay 
-# mapWindow <- c(-122.7,-121.8,37.0,38.3)     # SF Bay 
+# mapWindow <- c(-123.1,-120.9,36.4,38.4)     # SF Bay 
 # mapWindow <- c(-122.45,-121.85,37.05,37.65) # Penninsula and South Bay 
 # mapWindow <- c(-123.1,-122.42,37.81,38.25)  # Marin County 
 # mapWindow <- c(-122.45,-121,40.3,41.6)      # CA Volcanos 
-# mapWindow <- c(-81.4,-80.0,36.8,37.6)       # Giles Cty/Blacksburg Area 
 
-
+# mapWindow <- c(-81.0,-80.0,36.9,37.6)       # Giles Cty/Blacksburg Area 
 
 

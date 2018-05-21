@@ -1,5 +1,5 @@
 draw3DMapTrack <- function(mapRaster,trackdf=NULL,
-                           featureLevels=c(3,3,2,5), #towns,roads,waterA,waterL
+                           featureLevels=c(3,4,4,5), #towns,roads,waterA,waterL
                            maxElev=3000,vScale=1.5,
                            colors="default",
                            citycolor="White",roadcolor="Black",
@@ -40,15 +40,18 @@ draw3DMapTrack <- function(mapRaster,trackdf=NULL,
   #  draw cities, water and roads in that order
   if ("town" %in% names(mapRaster)) {
     town <- as.matrix(mapRaster[["town"]])
+    town[ is.na(town) ] <- 0
     col[ town >= featureLevels[1] ] <- gplots::col2hex(citycolor)
     town <- NULL
   }
   if ("waterA" %in% names(mapRaster)) {
     waterA <- as.matrix(mapRaster[["waterA"]])
+    waterA[ is.na(waterA) ] <- 0
     col[ waterA >= featureLevels[3] ] <- gplots::col2hex(watercolor)
   }
   if ("waterL" %in% names(mapRaster)) {
     waterL <- as.matrix(mapRaster[["waterL"]])
+    waterL[ is.na(waterL) ] <- 0
     col[ waterL >= featureLevels[4] ] <- gplots::col2hex(watercolor)
     waterL <- NULL    
   }
@@ -58,6 +61,7 @@ draw3DMapTrack <- function(mapRaster,trackdf=NULL,
   }
   if ("road" %in% names(mapRaster)) {
     road <- as.matrix(mapRaster[["road"]])
+    road[ is.na(road) ] <- 0
     col[ road >= featureLevels[2] ] <- gplots::col2hex(roadcolor)
     road <- NULL
   }

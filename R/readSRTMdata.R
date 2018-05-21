@@ -1,8 +1,8 @@
-loadMapElevData <- function(mapcrop,mapDataDir,resstr) {
+loadMapElevData <- function(mapshape,mapDataDir,resstr) {
   m.sub <- NULL
   j <- 1
   r.list <- list()
-  mapextent <- raster::extent(mapcrop)
+  mapextent <- raster::extent(mapshape)
   print(mapextent)
   ELonMin <- floor(max(mapextent@xmin,0))
   ELonMax <- floor(max(mapextent@xmax,0))
@@ -86,14 +86,14 @@ loadMapElevData <- function(mapcrop,mapDataDir,resstr) {
                                 c(ymin,ymin,ymax,ymax,ymin)))
       ei <- sp::SpatialPolygons(list(Polygons(list(pgon), ID = "1deg")),
                                 proj4string=CRS("+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs"))
-      if (rgeos::gContainsProperly(mapcrop, ei)) {
+      if (rgeos::gContainsProperly(mapshape, ei)) {
         print("interior - not masked")
-      } else if (rgeos::gIntersects(mapcrop, ei)) {
+      } else if (rgeos::gIntersects(mapshape, ei)) {
         print(paste0("boundary - masking time = ",system.time(
-          tmp <- raster::mask(raster::crop(tmp, extent(mapcrop),snap="near"),
-                              mapcrop)
+          tmp <- raster::mask(raster::crop(tmp, extent(mapshape),snap="near"),
+                              mapshape)
         ))[[3]])
-        print(origin(tmp))
+        #print(origin(tmp))
       } else {
         print("exterior - not used")
         tmp <- NULL

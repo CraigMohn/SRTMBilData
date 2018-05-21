@@ -2,11 +2,11 @@ loadSavedElevData <- function(savedNameVec,rasterDir) {
   j <- 1
   r.list <- list()
   for (st in savedNameVec) {
-    fvec <- list.files(path=rasterDir,
+    fvec <- list.files(path=paste0(rasterDir,"/",st),
                        pattern=paste0(st,"elevs[0-9]{,2}.grd"))
     for (fn in fvec) {
       print(paste0("loading ",fn))
-      elevations <- raster(paste0(datadir,"/rasterfiles/",fn))
+      elevations <- raster(paste0(rasterDir,"/",st,"/",fn))
       print(elevations)
       r.list[[j]] <- elevations
       j <- j + 1
@@ -29,11 +29,11 @@ loadSavedFeatureData <- function(savedNameVec,rasterDir) {
     j <- 1
     r.list <- list()
     for (st in savedNameVec) {
-      fvec <- list.files(path=rasterDir,
+      fvec <- list.files(path=paste0(rasterDir,"/",st),
                          pattern=paste0(st,"features[0-9]{,2}_",layername,".grd"))
       for (fn in fvec) {
         print(paste0("loading ",fn))
-        featureLayer <- raster::raster(paste0(datadir,"/rasterfiles/",fn))
+        featureLayer <- raster::raster(paste0(rasterDir,"/",st,"/",fn))
         print(featureLayer)
         r.list[[j]] <- featureLayer
         j <- j + 1
@@ -54,11 +54,34 @@ loadSavedFeatureData <- function(savedNameVec,rasterDir) {
   names(rStack) <- lnames
   return(rStack)
 }
+readShapeFiles <- function(stname,shapefileDir,workProj4) {
+  print(paste0("loading shapefiles for ",stname))
+  tmp <- raster::shapefile(paste0(shapefileDir,"/",stname,
+                                  "Town.shp")) # SpatialPolygonsDF
+  tmp <- sp::spTransform(tmp,workProj4)
+  spTown <- tmp
+  tmp <- raster::shapefile(paste0(shapefileDir,"/",stname,
+                                  "Roads.shp")) # SpatialLinesDF
+  tmp <- sp::spTransform(tmp,workProj4)
+  spRoads <- tmp
+  tmp <- raster::shapefile(paste0(shapefileDir,"/",stname,
+                                  "WaterA")) # SpatialPolygonsDF
+  tmp <- sp::spTransform(tmp,workProj4)
+  spWaterA <- tmp
+  tmp <- raster::shapefile(paste0(shapefileDir,"/",stname,
+                                  "WaterL")) # SpatialLinesDF
+  tmp <- sp::spTransform(tmp,workProj4)
+  spWaterL <- tmp
+  print("done loading shapefiles")
+  return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
+}
+
 writeElevRaster <- function(elevations,maxrastercells,rasterDir,fname) {
+  dir.create(file.path(rasterDir, fname))
   nchunks <- ceiling(raster::ncell(elevations)/maxrastercells)
   print(paste0("saving raster data in ",nchunks," slices"))
   if (nchunks == 1) {
-    writeRaster(elevations,file=paste0(rasterDir,"/",
+    writeRaster(elevations,file=paste0(rasterDir,"/",fname,"/",
                                        fname,"elevs.grd"),
                 overwrite=TRUE)   
   } else {
@@ -80,7 +103,7 @@ writeElevRaster <- function(elevations,maxrastercells,rasterDir,fname) {
       chunkraster <- raster::trim(raster::crop(elevations,chunkcrop))
       print(paste0("writing ",chunk))
       writeRaster(chunkraster,
-                  file=paste0(rasterDir,"/",
+                  file=paste0(rasterDir,"/",fname,"/",
                               fname,"elevs",
                               stringr::str_pad(chunk,2,pad="0"),".grd"),
                   overwrite=TRUE)    
@@ -88,10 +111,25 @@ writeElevRaster <- function(elevations,maxrastercells,rasterDir,fname) {
   }
   return(NULL)
 }
+writeShapeFiles <- function(stname,shapefileDir,spTown,spRoads,spWaterA,spWaterL) {
+  print(paste0("writing feature shapefiles for ",stname))
+  raster::shapefile(spRoads,filename=paste0(shapefileDir,"/",stname,"Roads.shp"),
+                    overwrite=TRUE)
+  raster::shapefile(spWaterA,filename=paste0(shapefileDir,"/",stname,"WaterA.shp"),
+                    overwrite=TRUE)
+  raster::shapefile(spWaterL,filename=paste0(shapefileDir,"/",stname,"WaterL.shp"),
+                    overwrite=TRUE)
+  raster::shapefile(spTown,filename=paste0(shapefileDir,"/",stname,"Town.shp"),
+                    overwrite=TRUE)
+  return(NULL)
+}
+
+##  to disappear soon
 writeFeatureRaster <- function(featureStack=NULL,elevations=NULL,mapshape=NULL,
                                maxrastercells,rasterDir,fname,
                                spTown=NULL,spRoads=NULL,
                                spWaterA=NULL,spWaterL=NULL,
+                               maxRasterize=10000,
                                polySimplify=0.0,polyMethod="vis", 
                                polyWeighting=0.85,polySnapInt=0.0001) {
   gc()        #  cleanup, this takes a lot of memory
@@ -125,13 +163,13 @@ writeFeatureRaster <- function(featureStack=NULL,elevations=NULL,mapshape=NULL,
       featureStack <- buildFeatureStack(elevations,mapshape=mapshape,
                                         spTown=spTown,spWaterA=spWaterA,
                                         spWaterL=spWaterL,spRoads=spRoads,
+                                        maxRasterize=maxRasterize,
                                         polySimplify=polySimplify,
                                         polyMethod=polyMethod, 
                                         polyWeighting=polyWeighting,
-                                        polySnapInt=polySnapInt) %>%
-            raster::trim(.)
-        writeRaster(featureStack,file=paste0(rasterDir,"/",
-                                       fname,"features.grd"),
+                                        polySnapInt=polySnapInt) 
+    writeRaster(featureStack,file=paste0(rasterDir,"/",
+                                         fname,"features.grd"),
                 bylayer=TRUE,suffix="names",   
                 datatype="INT1S",overwrite=TRUE)   
   } else {
@@ -150,15 +188,14 @@ writeFeatureRaster <- function(featureStack=NULL,elevations=NULL,mapshape=NULL,
         chunkraster <- buildFeatureStack(chunkelev,mapshape=mapshape,
                                          spTown=spTown,spWaterA=spWaterA,
                                          spWaterL=spWaterL,spRoads=spRoads,
+                                         maxRasterize=maxRasterize,
                                          polySimplify=polySimplify,
                                          polyMethod=polyMethod, 
                                          polyWeighting=polyWeighting,
-                                         polySnapInt=polySnapInt) %>%
-                  raster::trim(.)     
+                                         polySnapInt=polySnapInt)
       } else {
         print(paste0("cropping ",chunk))
-        chunkraster <- raster::crop(featureStack,chunkcrop) %>%
-                  raster::trim(.)              
+        chunkraster <- raster::crop(featureStack,chunkcrop) 
       }
       print(paste0("writing ",chunk))
       print(chunkraster)
@@ -173,37 +210,3 @@ writeFeatureRaster <- function(featureStack=NULL,elevations=NULL,mapshape=NULL,
   }
   return(NULL)
 }
-writeShapeFiles <- function(stname,shapefileDir,spTown,spRoads,spWaterA,spWaterL) {
-  print(paste0("writing feature shapefiles for ",stname))
-  raster::shapefile(spRoads,filename=paste0(shapefileDir,"/",stname,"Roads.shp"),
-                    overwrite=TRUE)
-  raster::shapefile(spWaterA,filename=paste0(shapefileDir,"/",stname,"WaterA.shp"),
-                    overwrite=TRUE)
-  raster::shapefile(spWaterL,filename=paste0(shapefileDir,"/",stname,"WaterL.shp"),
-                    overwrite=TRUE)
-  raster::shapefile(spTown,filename=paste0(shapefileDir,"/",stname,"Town.shp"),
-                    overwrite=TRUE)
-  return(NULL)
-}
-readShapeFiles <- function(stname,shapefileDir,workProj4) {
-  print(paste0("loading shapefiles for ",stname))
-  tmp <- raster::shapefile(paste0(shapefileDir,"/",stname,
-                                  "Town.shp")) # SpatialPolygonsDF
-  tmp <- sp::spTransform(tmp,workProj4)
-  spTown <- tmp
-  tmp <- raster::shapefile(paste0(shapefileDir,"/",stname,
-                                  "Roads.shp")) # SpatialLinesDF
-  tmp <- sp::spTransform(tmp,workProj4)
-  spRoads <- tmp
-  tmp <- raster::shapefile(paste0(shapefileDir,"/",stname,
-                                  "WaterA")) # SpatialPolygonsDF
-  tmp <- sp::spTransform(tmp,workProj4)
-  spWaterA <- tmp
-  tmp <- raster::shapefile(paste0(shapefileDir,"/",stname,
-                                  "WaterL")) # SpatialLinesDF
-  tmp <- sp::spTransform(tmp,workProj4)
-  spWaterL <- tmp
-  print("done loading shapefiles")
-  return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
-}
-

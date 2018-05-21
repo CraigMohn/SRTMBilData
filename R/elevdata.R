@@ -12,6 +12,7 @@ library(rmapshaper)
 library(viridis)
 
 source("C:/bda/SRTMBilData/R/drawMapRGL.R")
+source("C:/bda/SRTMBilData/R/featuresForElevations.R")
 source("C:/bda/SRTMBilData/R/functions.R")
 source("C:/bda/SRTMBilData/R/featurefunctions.R")
 source("C:/bda/SRTMBilData/R/displayfunctions.R")
@@ -30,7 +31,7 @@ mapLibSelector <- 1  # 1=northAmerica+NE Pacific 1s, 2=Europe 3s, 3=Australia 3s
 #cropbox <- raster::extent(-180, 170, -50, 60)
 #if (!is.null(mapWindow)) cropbox <- raster::extent(mapWindow)
 #cropbox <- raster::extent(-160.25, -154.8, 18.9, 22.25) # hawaii main islands only
-#cropbox <- raster::extent(-180, 170, -50, 52.1) #  southern slice of BC,AB,SK 
+cropbox <- raster::extent(-180, 170, -50, 54.8) #  southern slice of BC,AB,SK 
 options(tigris_use_cache = TRUE)
 
 datadir <- "c:/bda"                        #  base dir - subs include shapefiles, rasterfile 
@@ -53,23 +54,48 @@ mapWindow <- NULL
 # mapWindow <- c(-81.4,-80.0,36.8,37.6)       # Giles Cty/Blacksburg Area 
 # mapWindow <- c(-123.25,-121.5,46.75,48.1)   # Seattle Area 
 # mapWindow <- c(-123.2,-122.4,48.3,48.8)     # San Juans
- mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 
+# mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 
 
-drawMapRGL(USStatevec="WA",
+drawMapRGL(USStatevec="MN", 
+           CAProvincevec=NULL, #AB,SK
            mapWindow=mapWindow,
            #cropbox=cropbox,
            elevDataSource="Raster",
            featureDataSource="Raster",
-           townLevel=9,roadLevel=2,waterALevel=4,waterLLevel=5,
-           vScale=2.0,
-           writeElevFile=TRUE,
-           writeFeatureFile=TRUE,
+           townLevel=3,roadLevel=4,waterALevel=4,waterLLevel=5,
+           vScale=2,maxElev=3000,
+           rglColorScheme="default",
+           #citycolor="purple",
+           #writeElevFile=TRUE,
+           #writeFeatureFile=TRUE,
            rasterDir=rasterDir,mapDataDir=mapDataDir,
            shapefileDir=shapefileDir,includeAllRoads=TRUE,
-           maxrastercells=200000000,saveRGL=TRUE,res3d=2500,
+           maxrastercells=200000000,saveRGL=FALSE,res3d=4000,
+           maxRasterize=200000,
            mapoutputdir=mapoutputdir,
-           rasterFileSetWriteNames="SammamishArea",
-           outputName="SammamishArea")
+           #rasterFileSetWriteNames="SanJuans",
+           outputName="MN")
 
+stop()
+elevations <- elevationsToRaster(rasterFileSetName="SK",
+                               USStatevec=NULL,CAProvincevec="SK",
+                               cropbox=cropbox,
+                               rasterDir=rasterDir,mapDataDir=mapDataDir,
+                               mapbuffer=0,mapmergebuffer=0,
+                               maxrastercells=250000000,
+                               workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
+                               resstr="_1arc_v3_bil") 
+    
 
-
+featuresForElevations(rasterFileSetName="SK",
+                      rasterDir=rasterDir,
+                      shapefileDir=shapefileDir,
+                      USStatevec=NULL,
+                      CAProvincevec="SK",
+                      featureDataSource="Shapefiles",
+                      includeAllRoads=TRUE,
+                      workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
+                      maxRasterize=1000000,
+                      polySimplify=0.0,polyMethod="vis", 
+                      polyWeighting=0.85,polySnapInt=0.0001) 
+  

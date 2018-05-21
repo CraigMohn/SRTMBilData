@@ -27,11 +27,13 @@ tmpt <- tmpt[tmpt@data[,"CMATYPE"]!="K",]
 ###   highways sldf
 tmpr <- raster::shapefile(paste0(datadir,"/CanadaShapefiles/Roads/",
                                  "lrnf000r16a_e.shp"))
-#  too huge - keep based on RANK 1=transcanada, 2=national, 3=major, 4=secondary hwy
-tmpr <- tmpr[as.numeric(tmpr@data[,"RANK"])<=4,]
-#  and CLASS - 10-13 hwys, 20-22 roads down to "collector", 23-26 minor roads, 27 rapid transit,
-#              80 - bridge/tunnel 
-tmpr <- tmpr[as.numeric(tmpr@data[,"CLASS"])<=13,]
+#  too huge - keep based on class
+#   10 Highway, 11 Expressway, 12 Primary highway, 13 Secondary highway
+#   20 Road, 21 Arterial, 22 Collector, 23 Local, 24 Alley/Lane/Utility
+#   25 Connector/Ramp, 26 Reserve/Trail, 27 Rapid transit
+#   80 - bridge/tunnel 
+tmpr <- tmpr[(as.numeric(tmpr@data[,"CLASS"])<=27 | 
+              as.numeric(tmpr@data[,"CLASS"])==80) , ]
 rdata <- tmpr@data
 row.names(rdata) <- rdata$NGDUID
 tmpr <- rgeos::gLineMerge(tmpr,byid=TRUE,id=tmpr@data$NGDUID)
@@ -81,7 +83,7 @@ for (i in 1:length(provlist)) {
                     overwrite=TRUE)
   print("starting roads")
   keep <- tmpr@data$PRUID_L == prid | tmpr@data$PRUID_L == prid
-  tmpmasked <- tmpr[keep,(names(tmpr) %in% c("NAME","RANK"))]
+  tmpmasked <- tmpr[keep,(names(tmpr) %in% c("NAME","CLASS"))]
   colnames(tmpmasked@data) <- c("NAME","TYPE")  
   plot(tmpmasked)
   raster::shapefile(tmpmasked,filename=paste0(datadir,"/shapefiles/",
