@@ -8,33 +8,49 @@ buildFeatureStack <- function(baseLayer,mapshape,
   #  returns a rasterStack  which has 4 layers which can be stored as ints
   bLrect <- as(raster::extent(baseLayer), "SpatialPolygons")
   sp::proj4string(bLrect) <- sp::proj4string(spTown)
-  if (!is.null(spTown)) {
-    print("towns")
-    spTown <- sxdfMask(spTown, bLrect)
+  if (!is.null(spRoads)) {
+    print("roads")
+    spRoads <- sxdfMask(spRoads,bLrect)
   }
-  if (!is.null(spTown)) {
-    print(paste0(nrow(spTown)," towns to process"))
-    spTown$value <- townRank(spTown@data[,"TYPE"],
-                             spTown@data[,"NAME"])
-    spTown <- spTown[spTown$value>=filterVec[1],]
-    tlayer <- shapeToRasterLayer(sxdf=spTown,
+  if (!is.null(spRoads)) {
+    print(paste0(nrow(spRoads)," roads to process"))
+    spRoads$value <- roadRank(spRoads@data[,"TYPE"],
+                              spRoads@data[,"NAME"] )      
+    spRoads <- spRoads[spRoads$value>=filterVec[2],]
+    rlayer <- shapeToRasterLayer(sxdf=spRoads,
                                  templateRaster=baseLayer,
-                                 maxRasterize=maxRasterize,
-                                 polySimplify=polySimplify,
-                                 polyMethod=polyMethod,
-                                 polyWeighting=polyWeighting,
-                                 polySnapInt=polySnapInt)
-    if (!is.finite(tlayer@data@min)) {
-      warning("tlayer mess-up")
-      print(tlayer@data@min)
+                                 maxRasterize=maxRasterize)
+    if (!is.finite(rlayer@data@min)) {
+      warning("rlayer mess-up")
+      print(rlayer@data@min)
     }
   } else {
-    tlayer <- raster::raster(nrows=nrow(baseLayer),
+    rlayer <- raster::raster(nrows=nrow(baseLayer),
                              ncols=ncol(baseLayer),
                              ext=extent(baseLayer),
                              crs=crs(baseLayer),
                              vals=0)
-    print("no towns to add")
+    print("no roads to add")
+  }
+  if (!is.null(spWaterL)) {
+    print(paste0(nrow(spWaterL)," water lines to process"))
+    spWaterL$value <- waterLRank(spWaterL@data[,"TYPE"],
+                                 spWaterL@data[,"NAME"] )      
+    spWaterL <- spWaterL[spWaterL$value>=filterVec[4],]
+    wLlayer <- shapeToRasterLayer(sxdf=spWaterL,
+                                  templateRaster=baseLayer,
+                                  maxRasterize=maxRasterize)
+    if (!is.finite(wLlayer@data@min)) {
+      warning("wLlayer mess-up")
+      print(wLlayer@data@min)
+    }
+  } else {
+    wLlayer <- raster::raster(nrows=nrow(baseLayer),
+                              ncols=ncol(baseLayer),
+                              ext=extent(baseLayer),
+                              crs=crs(baseLayer),
+                              vals=0)
+    print("no water lines to add")
   }
   if (!is.null(spWaterA)) {
     print("water polygons")
@@ -65,55 +81,35 @@ buildFeatureStack <- function(baseLayer,mapshape,
                               vals=0)
     print("no water polygons to add")
   }
-  if (!is.null(spWaterL)) {
-    print("water lines")
-    spWaterL <- sxdfMask(spWaterL,bLrect)
+  if (!is.null(spTown)) {
+    print("towns")
+    spTown <- sxdfMask(spTown, bLrect)
   }
-  if (!is.null(spWaterL)) {
-    print(paste0(nrow(spWaterL)," water lines to process"))
-    spWaterL$value <- waterLRank(spWaterL@data[,"TYPE"],
-                                 spWaterL@data[,"NAME"] )      
-    spWaterL <- spWaterL[spWaterL$value>=filterVec[4],]
-    wLlayer <- shapeToRasterLayer(sxdf=spWaterL,
-                                  templateRaster=baseLayer,
-                                  maxRasterize=maxRasterize)
-    if (!is.finite(wLlayer@data@min)) {
-      warning("wLlayer mess-up")
-      print(wLlayer@data@min)
-    }
-  } else {
-    wLlayer <- raster::raster(nrows=nrow(baseLayer),
-                              ncols=ncol(baseLayer),
-                              ext=extent(baseLayer),
-                              crs=crs(baseLayer),
-                              vals=0)
-    print("no water lines to add")
-  }
-  if (!is.null(spRoads)) {
-    print("roads")
-    spRoads <- sxdfMask(spRoads,bLrect)
-  }
-  if (!is.null(spRoads)) {
-    print(paste0(nrow(spRoads)," roads to process"))
-    spRoads$value <- roadRank(spRoads@data[,"TYPE"],
-                              spRoads@data[,"NAME"] )      
-    spRoads <- spRoads[spRoads$value>=filterVec[2],]
-    rlayer <- shapeToRasterLayer(sxdf=spRoads,
+  if (!is.null(spTown)) {
+    print(paste0(nrow(spTown)," towns to process"))
+    spTown$value <- townRank(spTown@data[,"TYPE"],
+                             spTown@data[,"NAME"])
+    spTown <- spTown[spTown$value>=filterVec[1],]
+    tlayer <- shapeToRasterLayer(sxdf=spTown,
                                  templateRaster=baseLayer,
-                                 maxRasterize=maxRasterize)
-    if (!is.finite(rlayer@data@min)) {
-      warning("rlayer mess-up")
-      print(rlayer@data@min)
+                                 maxRasterize=maxRasterize,
+                                 polySimplify=polySimplify,
+                                 polyMethod=polyMethod,
+                                 polyWeighting=polyWeighting,
+                                 polySnapInt=polySnapInt)
+    if (!is.finite(tlayer@data@min)) {
+      warning("tlayer mess-up")
+      print(tlayer@data@min)
     }
   } else {
-    rlayer <- raster::raster(nrows=nrow(baseLayer),
+    tlayer <- raster::raster(nrows=nrow(baseLayer),
                              ncols=ncol(baseLayer),
                              ext=extent(baseLayer),
                              crs=crs(baseLayer),
                              vals=0)
-    print("no roads to add")
+    print("no towns to add")
   }
-  s <- raster::stack(tlayer,wAlayer,wLlayer,rlayer)
+   s <- raster::stack(tlayer,wAlayer,wLlayer,rlayer)
   names(s) <- c("town","waterA","waterL","road")  
   return(s)
 }

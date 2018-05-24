@@ -37,6 +37,7 @@ featuresForElevations <- function(rasterFileSetName,
                                   featureDataSource="Shapefiles",
                                   writeShapefiles=TRUE,includeAllRoads=FALSE,
                                   workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
+                                  mapbuffer=0,mapmergebuffer=0,
                                   maxRasterize=100000,
                                   polySimplify=0.0,polyMethod="vis", 
                                   polyWeighting=0.85,polySnapInt=0.0001) {
@@ -45,7 +46,7 @@ featuresForElevations <- function(rasterFileSetName,
   mapshape <- mapMask(USStatevec=USStatevec,CAProvincevec=CAProvincevec,
                       USParkvec=NULL,worldCountryvec=NULL,
                       mapWindow=NULL,
-                      mapbuffer=0,mapmergebuffer=0,
+                      mapbuffer=mapbuffer,mapmergebuffer=mapmergebuffer,
                       parkdir=NULL,
                       workProj4=workProj4)
   plot(mapshape)

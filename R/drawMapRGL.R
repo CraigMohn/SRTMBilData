@@ -12,7 +12,7 @@ drawMapRGL <- function(mapWindow=NULL,
                        saveRGL=FALSE,mapoutputdir=NULL,outputName=NULL,
                        workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
                        elevDataSource="SRTM",
-                       rasterFileSetNames=NULL,rasterFileSetWriteNames=NULL,
+                       rasterFileSetNames=NULL,rasterFileSetWriteName=NULL,
                        featureDataSource="Shapefiles",
                        writeElevFile=FALSE,writeFeatureFile=FALSE,
                        writeShapefiles=TRUE,includeAllRoads=FALSE,
@@ -24,12 +24,12 @@ drawMapRGL <- function(mapWindow=NULL,
                        polyWeighting=0.85,polySnapInt=0.0001) {
 
   if (elevDataSource=="Raster" & writeElevFile &
-           is.null(rasterFileSetWriteNames)) {
+           is.null(rasterFileSetWriteName)) {
     warning("will not overwrite elev rasterfileset that was source")
     writeElevFile <- FALSE
   }
   if (featureDataSource=="Raster" & writeFeatureFile &
-           is.null(rasterFileSetWriteNames)){
+           is.null(rasterFileSetWriteName)){
     warning("will not overwrite feature rasterfileset that was source")
     writeFeatureFile <- FALSE
   }
@@ -86,13 +86,25 @@ drawMapRGL <- function(mapWindow=NULL,
   }
   ###   and write out the elevation raster if requested
   if (writeElevFile) {
-    if (!is.null(rasterFileSetWriteNames)) {
-      fname <- rasterFileSetWriteNames
+    if (!is.null(rasterFileSetWriteName)) {
+      fname <- rasterFileSetWriteName
     } else {
       fname <- paste0(statesInMap,collapse="")
     }
     writeElevRaster(elevations,maxrastercells,rasterDir,
                                      fname=fname)
+    if (writeFeatureFile) 
+      featuresForElevations(rasterFileSetName=fname,
+                            rasterDir=rasterDir,shapefileDir=shapefileDir,
+                            USStatevec=USStatevec,CAProvincevec=CAProvincevec,
+                            featureDataSource="Shapefiles",
+                            writeShapefiles=writeShapefiles,
+                            includeAllRoads=includeAllRoads,
+                            workProj4=workProj4,
+                            maxRasterize=maxRasterize,
+                            polySimplify=polySimplify,polyMethod=polymethod, 
+                            polyWeighting=polyWeighting,
+                            polySnapInt=polySnapInt)
   }
   
   ##  Elevation data set up, now load feature raster or get shapefiles ready
@@ -142,8 +154,8 @@ drawMapRGL <- function(mapWindow=NULL,
     spWaterL <- NULL
   }
   if (writeFeatureFile) { 
-    if (!is.null(rasterFileSetWriteNames)) {
-      fname <- rasterFileSetWriteNames
+    if (!is.null(rasterFileSetWriteName)) {
+      fname <- rasterFileSetWriteName
     } else {
       fname <- paste0(statesInMap,collapse="")
     }

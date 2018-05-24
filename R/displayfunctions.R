@@ -72,8 +72,8 @@ draw3DMapTrack <- function(mapRaster,trackdf=NULL,
     } else {
       xmin <- raster::extent(mapRaster)[1]
       xmax <- raster::extent(mapRaster)[2]
-      xmin <- raster::extent(mapRaster)[3]
-      xmax <- raster::extent(mapRaster)[4]
+      ymin <- raster::extent(mapRaster)[3]
+      ymax <- raster::extent(mapRaster)[4]
       xlen <-
         (raster::pointDistance(cbind(xmin,ymin),cbind(xmax,ymin),lonlat=TRUE) +
            raster::pointDistance(cbind(xmin,ymax),cbind(xmax,ymax),lonlat=TRUE)) /
@@ -186,4 +186,20 @@ pan3d <- function(button) {
   }
   rgl::rgl.setMouseCallbacks(button, begin, update)
   cat("Callbacks set on button", button, "of rgl device", rgl.cur(), "\n")
+}
+getMapImageRaster <- function(mapRaster,mapImageType="bing",
+      projection="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs") {
+  xmin <- raster::extent(mapRaster)[1]
+  xmax <- raster::extent(mapRaster)[2]
+  ymin <- raster::extent(mapRaster)[3]
+  ymax <- raster::extent(mapRaster)[4]
+  
+  mapImage <- openStreetMap::openmap(upperLeft=c(xmin,ymax),
+                      lowerRight=c(xmax,ymin),
+                      zoom=14,type=mapImageType) %>%
+              openSteetMap::openproj(.,projection=projection) %>%
+              raster::raster(.) 
+   #resize it.... 
+    
+  
 }

@@ -46,5 +46,6 @@ expandRegions <- function(invec,country) {
 # mapWindow <- c(-122.45,-121,40.3,41.6)      # CA Volcanos 
 
 # mapWindow <- c(-81.0,-80.0,36.9,37.6)       # Giles Cty/Blacksburg Area 
+# mapWindow <- c(-62.0,-59.5,45.4,47.11)       # Cape Breton Island 
 
 
