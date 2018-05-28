@@ -30,10 +30,9 @@ mapLibSelector <- 1  # 1=northAmerica+NE Pacific 1s, 2=Europe 3s, 3=Australia 1s
 #worldCountryvec <-  c("DEU","AUT","CZE","CHE","FRA") #NULL # <- c("ESP","PRT","FRA") # http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html
 
 cropbox <- NULL
-#cropbox <- raster::extent(-180, 170, -50, 60)
-#if (!is.null(mapWindow)) cropbox <- raster::extent(mapWindow)
-#cropbox <- raster::extent(-160.25, -154.8, 18.9, 22.25) # hawaii main islands only
-#cropbox <- raster::extent(-180, 170, -50, 54.7) #  southern slice of BC,AB,SK 
+#cropbox <- c(-180, 170, -50, 60)
+#cropbox <- c(-160.25, -154.8, 18.9, 22.25) # hawaii main islands only
+#cropbox <- c(-180, 170, -50, 54.7) #  southern slice of BC,AB,SK 
 options(tigris_use_cache = TRUE)
 
 datadir <- "c:/bda"                        #  base dir - subs include shapefiles, rasterfile 
@@ -59,18 +58,18 @@ mapWindow <- NULL
 # mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 
 # mapWindow <- c(-62.0,-59.5,45.4,47.11)      # Cape Breton Island 
 
-drawMapRGL(USStatevec="WV", #VA,WV
+drawMapRGL(USStatevec="MN", #VA,WV
            CAProvincevec=NULL,
            mapWindow=mapWindow,
            #rasterFileSetNames="SeattleArea",
            cropbox=cropbox,
-           elevDataSource="SRTM",
-           featureDataSource="TIGER",
+           elevDataSource="Raster",
+           featureDataSource="Shapefiles",
            townLevel=3,roadLevel=4,waterALevel=4,waterLLevel=5,
            vScale=1,maxElev=3000,
            rglColorScheme="default",
            #citycolor="purple",
-           writeElevFile=TRUE,
+           #writeElevFile=TRUE,
            writeFeatureFile=TRUE,
            year=2017,
            rasterDir=rasterDir,mapDataDir=mapDataDir,
@@ -79,7 +78,7 @@ drawMapRGL(USStatevec="WV", #VA,WV
            maxRasterize=300000,
            mapoutputdir=mapoutputdir,
            #rasterFileSetWriteName="SammamishArea",
-           outputName="WV")
+           outputName="MN")
 
 stop()
 elevations <- elevationsToRaster(rasterFileSetName="SK",

@@ -5,6 +5,8 @@ draw3DMapTrack <- function(mapRaster,trackdf=NULL,
                            citycolor="White",roadcolor="Black",
                            watercolor="Blue",glaciercolor="White",
                            rglNAcolor="Blue",rglNegcolor=NA,
+                           rglShininess=0,
+                           rglSpecular="black", rglDiffuse="white", rglAmbient="white",
                            trackcolor="Magenta",trackCurve=FALSE,
                            trackCurveElevFromRaster=TRUE,trackCurveHeight=10,
                            saveRGL=FALSE,mapoutputdir=NA,
@@ -100,11 +102,13 @@ draw3DMapTrack <- function(mapRaster,trackdf=NULL,
                          -0.03,0.60,0.80,0,0,0,0,1),ncol=4,nrow=4)
   rgl::rgl.clear()
   rgl::surface3d(x,y,mmmelev,color=col)
-  rgl::material3d(alpha=1.0,point_antialias=TRUE,smooth=FALSE,shininess=0)
+  rgl::material3d(alpha=1.0,point_antialias=TRUE,
+                  smooth=FALSE,
+                  shininess=rglShininess)
   rgl::aspect3d(x=1,y=1/yscale,z=0.035*vScale)
   rgl::rgl.clear("lights")
-  rgl::rgl.light(theta = 0, phi = 15,
-                 viewpoint.rel=TRUE, specular="black")
+  rgl::rgl.light(theta = 0, phi = 15,viewpoint.rel=TRUE,
+                 specular=rglSpecular, diffuse=rglDiffuse, ambient=rglAmbient)
   rgl::rgl.viewpoint(userMatrix=userMatrix,type="modelviewpoint")
   pan3d(2)  # right button for panning, doesn't play well with zoom)
   if (!is.null(trackdf) & trackCurve) {

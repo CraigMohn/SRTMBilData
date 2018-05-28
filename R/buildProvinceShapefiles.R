@@ -4,6 +4,9 @@ library(sp)
 
 #  script to extract Canada shapefiles for towns, roads and water, do rough filtering, 
 #      format to match US versions, and save in directory
+#
+#  http://www12.statcan.gc.ca/census-recensement/2011/geo/RNF-FRR/index-eng.cfm
+#  http://www12.statcan.gc.ca/census-recensement/2011/geo/bound-limit/bound-limit-eng.cfm
 
 datadir <- "c:/bda"                    #  base dir - subs include shapefiles, rasterfile 
 workProj4 <- "+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs"
