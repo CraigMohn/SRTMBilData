@@ -123,55 +123,26 @@ writeShapeFiles <- function(stname,shapefileDir,spTown,spRoads,spWaterA,spWaterL
                     overwrite=TRUE)
   return(NULL)
 }
+writeFeatureRaster <- function(featureStack,maxrastercells,rasterDir,fname) {
 
-##  to disappear soon
-writeFeatureRaster <- function(featureStack=NULL,elevations=NULL,mapshape=NULL,
-                               maxrastercells,rasterDir,fname,
-                               spTown=NULL,spRoads=NULL,
-                               spWaterA=NULL,spWaterL=NULL,
-                               maxRasterize=10000,
-                               polySimplify=0.0,polyMethod="vis", 
-                               polyWeighting=0.85,polySnapInt=0.0001) {
-  gc()        #  cleanup, this takes a lot of memory
-  
-  if (is.null(featureStack) & (is.null(elevations)|is.null(mapshape)))
-    stop("no feature rasterStack and no elevation/mapshape pair")
-  if (!is.null(featureStack)) {
-    nchunks <- ceiling(raster::ncell(featureStack)/maxrastercells)
-    rnrow <- raster::nrow(featureStack)
-    nrowchunk <- ceiling(raster::nrow(featureStack)/nchunks)
-    rxmin <- raster::xmin(featureStack)
-    rxmax <- raster::xmax(featureStack)
-    rymin <- raster::ymin(featureStack) 
-    rymax <- raster::ymax(featureStack) 
-    ryres <- raster::yres(featureStack)
-    tempProj4 <- sp::proj4string(featureStack)
-  } else {
-    nchunks <- ceiling(raster::ncell(elevations)/maxrastercells)
-    rnrow <- raster::nrow(elevations)
-    nrowchunk <- ceiling(raster::nrow(elevations)/nchunks)
-    rxmin <- raster::xmin(elevations)
-    rxmax <- raster::xmax(elevations)
-    rymin <- raster::ymin(elevations) 
-    rymax <- raster::ymax(elevations) 
-    ryres <- raster::yres(elevations)
-    tempProj4 <- sp::proj4string(elevations)
-  }
+  nchunks <- ceiling(raster::ncell(featureStack)/maxrastercells)
+  rnrow <- raster::nrow(featureStack)
+  nrowchunk <- ceiling(raster::nrow(featureStack)/nchunks)
+  rxmin <- raster::xmin(featureStack)
+  rxmax <- raster::xmax(featureStack)
+  rymin <- raster::ymin(featureStack) 
+  rymax <- raster::ymax(featureStack) 
+  ryres <- raster::yres(featureStack)
+  tempProj4 <- sp::proj4string(featureStack)
   print(paste0("saving featureraster data in ",nchunks," slices"))
   if (nchunks == 1) {
-    if (is.null(featureStack))
-      featureStack <- buildFeatureStack(elevations,mapshape=mapshape,
-                                        spTown=spTown,spWaterA=spWaterA,
-                                        spWaterL=spWaterL,spRoads=spRoads,
-                                        maxRasterize=maxRasterize,
-                                        polySimplify=polySimplify,
-                                        polyMethod=polyMethod, 
-                                        polyWeighting=polyWeighting,
-                                        polySnapInt=polySnapInt) 
-    writeRaster(featureStack,file=paste0(rasterDir,"/",
-                                         fname,"features.grd"),
-                bylayer=TRUE,suffix="names",   
-                datatype="INT1S",overwrite=TRUE)   
+     print(paste0("writing ",fname,".grd"))
+     writeRaster(featureStack,
+                 file=paste0(rasterDir,"/",fname,"/",
+                             fname,"features",
+                             ".grd"),
+                 bylayer=TRUE,suffix="names",   
+                 datatype="INT1S",overwrite=TRUE)   
   } else {
     for (chunk in 1:nchunks) {
       ylow <- rymin + ryres*((chunk-1)*nrowchunk)
@@ -182,24 +153,9 @@ writeFeatureRaster <- function(featureStack=NULL,elevations=NULL,mapshape=NULL,
                                   ylow,yhi)
       chunkcrop <- as(chunkcrop, "SpatialPolygons")
       sp::proj4string(chunkcrop) <- tempProj4
-      if (is.null(featureStack)) {
-        print(paste0("cropping, building and masking ",chunk))
-        chunkelev <- raster::crop(elevations,chunkcrop)
-        chunkraster <- buildFeatureStack(chunkelev,mapshape=mapshape,
-                                         spTown=spTown,spWaterA=spWaterA,
-                                         spWaterL=spWaterL,spRoads=spRoads,
-                                         maxRasterize=maxRasterize,
-                                         polySimplify=polySimplify,
-                                         polyMethod=polyMethod, 
-                                         polyWeighting=polyWeighting,
-                                         polySnapInt=polySnapInt)
-      } else {
-        print(paste0("cropping ",chunk))
-        chunkraster <- raster::crop(featureStack,chunkcrop) 
-      }
+      print(paste0("cropping ",chunk))
+      chunkraster <- raster::crop(featureStack,chunkcrop) 
       print(paste0("writing ",chunk))
-      print(chunkraster)
-      plot(chunkraster[["road"]])
       writeRaster(chunkraster,
                   file=paste0(rasterDir,"/",
                               fname,"features",

@@ -3,7 +3,8 @@ mapMask <- function(USStatevec=NULL,CAProvincevec=NULL,
                     mapWindow=NULL,
                     mapbuffer=0,mapmergebuffer=10,
                     parkdir,
-                    workProj4="+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs") {
+                    workProj4="+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs",
+                    year=2017) {
 ##    return a spatial polygon mask for the map 
   if (is.null(USStatevec)&is.null(CAProvincevec)&
       is.null(USParkvec)&is.null(worldCountryvec)&is.null(mapWindow))
@@ -12,7 +13,7 @@ mapMask <- function(USStatevec=NULL,CAProvincevec=NULL,
   mapshape <- NULL
   if (!is.null(USStatevec)) {
     USStatevec <- expandRegions(unique(toupper(USStatevec)),"US")  # US State abbrev all upper case
-    mcrop <- tigris::counties(USStatevec) %>% 
+    mcrop <- tigris::counties(USStatevec,year=year) %>% 
              rgeos::gUnaryUnion(.) %>% 
              sp::spTransform(.,sp::CRS(workProj4))
     ## tigris returns a SpatialPolgonsDF and gUnaryUnion returns a SpatialPolygons

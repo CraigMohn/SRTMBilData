@@ -6,6 +6,7 @@ elevationsToRaster <- function(rasterFileSetName="default",
                                mapbuffer=0,mapmergebuffer=0,
                                maxrastercells=250000000,
                                workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
+                               year=2017,
                                resstr="_1arc_v3_bil") {
   
   mapshape <- mapMask(USStatevec=USStatevec,CAProvincevec=CAProvincevec,
@@ -13,7 +14,7 @@ elevationsToRaster <- function(rasterFileSetName="default",
                       mapWindow=mapWindow,
                       mapbuffer=mapbuffer,mapmergebuffer=mapmergebuffer,
                       parkdir=parkDir,
-                      workProj4=workProj4)
+                      workProj4=workProj4,year=year)
   
   #   now crop to the cropbox 
   if (!is.null(cropbox)) {
@@ -36,6 +37,7 @@ featuresForElevations <- function(rasterFileSetName,
                                   CAProvincevec=NULL,
                                   featureDataSource="Shapefiles",
                                   writeShapefiles=TRUE,includeAllRoads=FALSE,
+                                  year=2017,
                                   workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
                                   mapbuffer=0,mapmergebuffer=0,
                                   maxRasterize=100000,
@@ -48,7 +50,7 @@ featuresForElevations <- function(rasterFileSetName,
                       mapWindow=NULL,
                       mapbuffer=mapbuffer,mapmergebuffer=mapmergebuffer,
                       parkdir=NULL,
-                      workProj4=workProj4)
+                      workProj4=workProj4,year=year)
   plot(mapshape)
 
   #   get shapefiles from State and Province vecs
@@ -56,7 +58,8 @@ featuresForElevations <- function(rasterFileSetName,
                         shapefileDir=shapefileDir,
                         writeShapefiles=writeShapefiles,
                         shapefileSource=featureDataSource,
-                        includeAllRoads=includeAllRoads)
+                        includeAllRoads=includeAllRoads,
+                        year=year)
   spTown <- tmp[["spTown"]]
   spRoads <- tmp[["spRoads"]]
   spWaterA <- tmp[["spWaterA"]]

@@ -29,10 +29,11 @@ mapLibSelector <- 1  # 1=northAmerica+NE Pacific 1s, 2=Europe 3s, 3=Australia 1s
 #CAProvincevec <- "BC" # c("BC","AB","SK")
 #worldCountryvec <-  c("DEU","AUT","CZE","CHE","FRA") #NULL # <- c("ESP","PRT","FRA") # http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html
 
+cropbox <- NULL
 #cropbox <- raster::extent(-180, 170, -50, 60)
 #if (!is.null(mapWindow)) cropbox <- raster::extent(mapWindow)
 #cropbox <- raster::extent(-160.25, -154.8, 18.9, 22.25) # hawaii main islands only
-cropbox <- raster::extent(-180, 170, -50, 54.7) #  southern slice of BC,AB,SK 
+#cropbox <- raster::extent(-180, 170, -50, 54.7) #  southern slice of BC,AB,SK 
 options(tigris_use_cache = TRUE)
 
 datadir <- "c:/bda"                        #  base dir - subs include shapefiles, rasterfile 
@@ -56,26 +57,29 @@ mapWindow <- NULL
 # mapWindow <- c(-123.25,-121.5,46.75,48.1)   # Seattle Area 
 # mapWindow <- c(-123.2,-122.4,48.3,48.8)     # San Juans
 # mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 
+# mapWindow <- c(-62.0,-59.5,45.4,47.11)      # Cape Breton Island 
 
-drawMapRGL(USStatevec=NULL, 
-           CAProvincevec="NS",
+drawMapRGL(USStatevec="WV", #VA,WV
+           CAProvincevec=NULL,
            mapWindow=mapWindow,
-           #cropbox=cropbox,
+           #rasterFileSetNames="SeattleArea",
+           cropbox=cropbox,
            elevDataSource="SRTM",
-           featureDataSource="Shapefiles",
-           townLevel=5,roadLevel=3,waterALevel=4,waterLLevel=5,
-           vScale=1.25,maxElev=2000,
+           featureDataSource="TIGER",
+           townLevel=3,roadLevel=4,waterALevel=4,waterLLevel=5,
+           vScale=1,maxElev=3000,
            rglColorScheme="default",
            #citycolor="purple",
            writeElevFile=TRUE,
            writeFeatureFile=TRUE,
+           year=2017,
            rasterDir=rasterDir,mapDataDir=mapDataDir,
            shapefileDir=shapefileDir,includeAllRoads=TRUE,
-           maxrastercells=200000000,saveRGL=FALSE,res3d=2800,
-           maxRasterize=100000,
+           maxrastercells=250000000,saveRGL=TRUE,res3d=2600,
+           maxRasterize=300000,
            mapoutputdir=mapoutputdir,
-           #rasterFileSetWriteNames="SanJuans",
-           outputName="NS")
+           #rasterFileSetWriteName="SammamishArea",
+           outputName="WV")
 
 stop()
 elevations <- elevationsToRaster(rasterFileSetName="SK",
@@ -88,30 +92,36 @@ elevations <- elevationsToRaster(rasterFileSetName="SK",
                                resstr="_1arc_v3_bil") 
     
 
-featuresForElevations(rasterFileSetName="NS",
+featuresForElevations(rasterFileSetName="WA",
                       rasterDir=rasterDir,
                       shapefileDir=shapefileDir,
-                      USStatevec="NS",
+                      USStatevec="WA",
                       CAProvincevec=NULL,
-                      featureDataSource="Shapefiles",
+                      featureDataSource="TIGER",
                       includeAllRoads=TRUE,
                       workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
                       maxRasterize=100000,
                       polySimplify=0.0,polyMethod="vis", 
                       polyWeighting=0.85,polySnapInt=0.0001) 
+# mapWindow <- c(-156.80,-155.97,20.50,21.05) # Maui
+# mapWindow <- c(-159.90,-159.15,21.75,22.35) # Kauai 
+# mapWindow <- c(-156.10,-154.75,18.85,20.30) # Big Island
 
-drawMapRGL(USStatevec=NULL, 
-           CAProvincevec=c("NS"),
+drawMapRGL(USStatevec="HI", 
+           CAProvincevec=NULL,
            mapWindow=mapWindow,
+           #rasterFileSetNames="SammamishArea",
            #cropbox=cropbox,
            elevDataSource="Raster",
            featureDataSource="Raster",
-           townLevel=5,roadLevel=4,waterALevel=4,waterLLevel=5,
-           vScale=1.25,maxElev=2000,
-           rglColorScheme="default",
+           townLevel=3,roadLevel=3,waterALevel=4,waterLLevel=5,
+           #townLevel=5,roadLevel=4,waterALevel=4,waterLLevel=5,
+           vScale=2.5,maxElev=2000,
+           rglColorScheme="beach",
+           citycolor="red",
            rasterDir=rasterDir,
-           saveRGL=TRUE,res3d=2800,
+           saveRGL=TRUE,res3d=2900,
            mapoutputdir=mapoutputdir,
-           outputName="NS")
+           outputName="Big Island")
 
   

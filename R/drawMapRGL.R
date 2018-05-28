@@ -15,14 +15,19 @@ drawMapRGL <- function(mapWindow=NULL,
                        rasterFileSetNames=NULL,rasterFileSetWriteName=NULL,
                        featureDataSource="Shapefiles",
                        writeElevFile=FALSE,writeFeatureFile=FALSE,
-                       writeShapefiles=TRUE,includeAllRoads=FALSE,
+                       writeShapefiles=TRUE,includeAllRoads=FALSE,year=2017,
                        rasterDir=NULL,mapDataDir=NULL,shapefileDir=NULL,parkdir=NULL,
                        resstr="_1arc_v3_bil",
                        mapbuffer=0,mapmergebuffer=0,
-                       maxrastercells=250000000,maxRasterize=10000,
+                       maxrastercells=250000000,maxRasterize=500000,
                        polySimplify=0.0,polyMethod="vis", 
                        polyWeighting=0.85,polySnapInt=0.0001) {
 
+  #  need to do read rasters write smaller rasters
+  subsetRasters <- elevDataSource=="Raster" & 
+                   featureDataSource=="Raster" &
+                   !is.null(rasterFileSetWriteName)
+  
   if (elevDataSource=="Raster" & writeElevFile &
            is.null(rasterFileSetWriteName)) {
     warning("will not overwrite elev rasterfileset that was source")
@@ -43,7 +48,8 @@ drawMapRGL <- function(mapWindow=NULL,
                      mapWindow=mapWindow,
                      mapbuffer=mapbuffer,mapmergebuffer=mapmergebuffer,
                      parkdir=parkDir,
-                     workProj4=workProj4)
+                     workProj4=workProj4,
+                     year=year)
   mapRectangle <- !is.null(mapWindow)
   statesInMap <- union(expandRegions(unique(toupper(USStatevec)),"US"),
                        expandRegions(unique(toupper(CAProvincevec)),"CANADA")
@@ -93,11 +99,11 @@ drawMapRGL <- function(mapWindow=NULL,
     }
     writeElevRaster(elevations,maxrastercells,rasterDir,
                                      fname=fname)
-    if (writeFeatureFile) 
+    if (writeFeatureFile & !subsetRasters)  
       featuresForElevations(rasterFileSetName=fname,
                             rasterDir=rasterDir,shapefileDir=shapefileDir,
                             USStatevec=USStatevec,CAProvincevec=CAProvincevec,
-                            featureDataSource="Shapefiles",
+                            featureDataSource=featureDataSource,
                             writeShapefiles=writeShapefiles,
                             includeAllRoads=includeAllRoads,
                             workProj4=workProj4,
@@ -107,25 +113,9 @@ drawMapRGL <- function(mapWindow=NULL,
                             polySnapInt=polySnapInt)
   }
   
-  ##  Elevation data set up, now load feature raster or get shapefiles ready
-  ##
-  #    can only write featureraster if 1) wrote elevraster or 2) read elevraster w/ same name
-  #     source can be shapefiles or featureraster for bigger area
-  
-  #    if (loadFeatureRasters)
-  #       load featurerasters and crop 
-  #       if write
-  #         write subset
-  #    else if  (wrote elevs or (read elevrasters and mapWindow=NULL) & write)
-  #       call featuresForElevs
-  #       load FeatureRasters
-  #    else
-  #       build from shapefiles after aggregate
-  #       
-
-  
   featureStack <- NULL
-  if (featureDataSource=="Raster") {
+  if ((featureDataSource=="Raster") | 
+      (writeFeatureFile & writeElevFile & !subsetRasters)){
     if (!is.null(rasterFileSetNames)) {
       savedNameVec <- rasterFileSetNames
     } else {
@@ -134,11 +124,33 @@ drawMapRGL <- function(mapWindow=NULL,
     featureStack <- loadSavedFeatureData(savedNameVec=savedNameVec,
                                          rasterDir=rasterDir) %>%
       raster::crop(.,mapshape) 
+    if (subsetRasters) 
+      writeFeatureRaster(featureStack,maxrastercells,rasterDir,fname=fname)
+  } else if (elevDataSource=="Raster" & writeFeatureFile) {
+    if (!is.null(rasterFileSetWriteName)) {
+      fname <- rasterFileSetWriteName
+    } else {
+      fname <- paste0(statesInMap,collapse="")
+    }
+    featuresForElevations(rasterFileSetName=fname,
+                          rasterDir=rasterDir,shapefileDir=shapefileDir,
+                          USStatevec=USStatevec,CAProvincevec=CAProvincevec,
+                          featureDataSource=featureDataSource,
+                          writeShapefiles=writeShapefiles,
+                          includeAllRoads=includeAllRoads,
+                          workProj4=workProj4,
+                          maxRasterize=maxRasterize,
+                          polySimplify=polySimplify,polyMethod=polymethod, 
+                          polyWeighting=polyWeighting,
+                          polySnapInt=polySnapInt)
+    featureStack <- loadSavedFeatureData(savedNameVec=savedNameVec,
+                                       rasterDir=rasterDir)
   } else if (featureDataSource %in% c("Shapefiles","TIGER")) {
     tmp <- loadShapeFiles(USStatevec,CAProvincevec,mapshape,
                           shapefileDir,writeShapefiles,
                           shapefileSource=featureDataSource,
-                          includeAllRoads=includeAllRoads)
+                          includeAllRoads=includeAllRoads,
+                          year=year)
     spTown <- tmp[["spTown"]]
     spRoads <- tmp[["spRoads"]]
     spWaterA <- tmp[["spWaterA"]]
@@ -153,28 +165,7 @@ drawMapRGL <- function(mapWindow=NULL,
     spWaterA <- NULL
     spWaterL <- NULL
   }
-  if (writeFeatureFile) { 
-    if (!is.null(rasterFileSetWriteName)) {
-      fname <- rasterFileSetWriteName
-    } else {
-      fname <- paste0(statesInMap,collapse="")
-    }
-    print("writing feature raster")
-    writeFeatureRaster(featureStack,elevations,mapshape=mapshape,
-                       maxrastercells=maxrastercells,
-                       rasterDir=rasterDir,
-                       fname=fname,
-                       spTown=spTown,spRoads=spRoads,
-                       spWaterA=spWaterA,spWaterL=spWaterL,
-                       maxRasterize=maxRasterize,
-                       polySimplify=0.0,polyMethod="vis", 
-                       polyWeighting=0.85,polySnapInt=0.0001)
-    #  only need do this if more than one chunk
-    print("loading feature raster")
-    featureStack <- loadSavedFeatureData(savedNameVec=fname,
-                                         rasterDir=rasterDir) 
-  }
-  
+
   if (!is.null(featureStack)) { 
     elevations <- raster::addLayer(elevations,featureStack)
     names(elevations[[1]]) <- "elevations"
@@ -193,7 +184,7 @@ drawMapRGL <- function(mapWindow=NULL,
   print(paste0(elevations@ncols," columns by ",elevations@nrows," rows"))
   
   if (featureDataSource %in% c("Shapefiles","TIGER") &
-      !writeFeatureFile){
+      is.null(featureStack)) {
     #  rasterize at the rendered resolution
     featureStack <- buildFeatureStack(elevations,mapshape=mapshape,
                                       spTown,spWaterA,spWaterL,spRoads,

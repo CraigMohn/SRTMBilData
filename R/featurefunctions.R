@@ -1,3 +1,8 @@
+#  rank change log
+#  20180524 - add TIGER "S1500" (vehicle trails) to Roads class 2 
+#  20180524 - add argument for TIGER data year, even state lines move 
+#       so e sure sure years match when merging/stacking rasters
+
 buildFeatureStack <- function(baseLayer,mapshape,
                               spTown,spWaterA,spWaterL,spRoads,
                               filterVec=c(1,1,1,1),  #towns,roads,waterA,waterL
@@ -31,6 +36,10 @@ buildFeatureStack <- function(baseLayer,mapshape,
                              crs=crs(baseLayer),
                              vals=0)
     print("no roads to add")
+  }
+  if (!is.null(spWaterL)) {
+    print("water lines")
+    spWaterL <- sxdfMask(spWaterL,bLrect)
   }
   if (!is.null(spWaterL)) {
     print(paste0(nrow(spWaterL)," water lines to process"))
@@ -145,11 +154,11 @@ shapeToRasterLayer <- function(sxdf,templateRaster,
       last <- min(i*maxRasterize,nrow(sxdf))
       gc()        #  cleanup, this takes a lot of memory
       rlayer <- velox::velox(zeroRaster)
-      print(paste0(round(system.time(
+      print(paste0("  ",round(system.time(
         rlayer$rasterize(spdf=sxdf[first:last,],field="value",background=0)
       )[[3]],digits=2)," rasterizing"))
       if (nloops>1) {
-        print(paste0(round(system.time(
+        print(paste0("  ",round(system.time(
           retRaster <- maxLayerValue(retRaster,rlayer$as.RasterLayer(band=1))
         )[[3]],digits=2)," combining"))
       } else {
@@ -186,13 +195,13 @@ roadRank <- function(rtype,rname) {
   #   25 Connector/Ramp, 26 Reserve/Trail, 27 Rapid transit
   #   80 - bridge/tunnel 
   rankR <- rep(1,length(rtype))                    # anything here gets a 1
-  rankR[rtype %in% c("S1630","S1640",
+  rankR[rtype %in% c("S1500","S1630","S1640",
                      "S1730","S1780","S1820",
-                     "24","25","26")]         <- 2 # Service Drive, Bike Path
+                     "24","25","26")]         <- 2 # Service Drive, Bike Path, etc
   rankR[rtype %in% c("S1400",
                      "20","21","22","23")]    <- 3 # Local Street
-  rankR[rtype %in% c("S1100","10","13","80")] <- 4 # secondary
-  rankR[rtype %in% c("S1200","11","12","27")] <- 5 # primary
+  rankR[rtype %in% c("S1100","10","13","80")] <- 4 # secondary hwy
+  rankR[rtype %in% c("S1200","11","12","27")] <- 5 # primary hwy/transit
   return(as.integer(rankR))
 }
 waterARank <- function(wtype,wname,wsize) {
@@ -245,7 +254,8 @@ waterLRank <- function(wtype,wname) {
 loadShapeFiles <- function(USStatevec,CAProvincevec,mapshape,
                            shapefileDir,writeShapefiles,
                            shapefileSource="Shapefiles",
-                           includeAllRoads=FALSE) {
+                           includeAllRoads=FALSE,
+                           year=2017) {
   workProj4 <- raster::crs(mapshape)
   spTown <- NULL
   spRoads <- NULL
@@ -257,7 +267,8 @@ loadShapeFiles <- function(USStatevec,CAProvincevec,mapshape,
                       shapefileSource=shapefileSource,
                       shapefileDir=shapefileDir,
                       writeShapefiles=writeShapefiles,
-                      includeAllRoads=includeAllRoads)
+                      includeAllRoads=includeAllRoads,
+                      year=year)
     spTown <- rbind_NULLok(spTown,tmp[["spTown"]])
     spRoads <- rbind_NULLok(spRoads,tmp[["spRoads"]])
     spWaterA <- rbind_NULLok(spWaterA,tmp[["spWaterA"]])
@@ -279,18 +290,20 @@ loadShapeFiles <- function(USStatevec,CAProvincevec,mapshape,
 USFeatures <- function(USStatevec,workProj4,
                        shapefileDir,writeShapefiles,
                        shapefileSource="TIGER",
-                       includeAllRoads=FALSE) {
+                       includeAllRoads=FALSE,
+                       year=2017) {
   spTown <- NULL
   spRoads <- NULL
   spWaterA <- NULL
   spWaterL <- NULL
   for (st in USStatevec) {
-    if (shapefileSource != "Shapefiles" | 
+    if (shapefileSource == "TIGER" | 
         !file.exists(paste0(shapefileDir,"/",st,"Town.shp"))) {
       tmp <- USTigerFeatures(st,workProj4=workProj4,
                              shapefileDir=shapefileDir,
                              writeShapefiles=writeShapefiles,
-                             includeAllRoads=includeAllRoads)
+                             includeAllRoads=includeAllRoads,
+                             year=year)
     } else {
       tmp <- readShapeFiles(st,shapefileDir,workProj4)
     }
@@ -303,10 +316,11 @@ USFeatures <- function(USStatevec,workProj4,
 }
 USTigerFeatures <- function(st,workProj4,
                             shapefileDir,writeShapefiles=TRUE,
-                            includeAllRoads=FALSE) {
-  stMask <- sp::spTransform(tigris::counties(st),workProj4)
+                            includeAllRoads=FALSE,
+                            year=2017) {
+  stMask <- sp::spTransform(tigris::counties(st,year=year),workProj4)
     
-  spTown <- sp::spTransform(tigris::urban_areas(),workProj4)
+  spTown <- sp::spTransform(tigris::urban_areas(year=year),workProj4)
   spTown <- spTown[,(names(spTown) %in% c("NAME10","UATYP10"))]
   colnames(spTown@data) <- c("NAME","TYPE")
   spTown <- sxdfMask(spTown,stMask,keepTouch=TRUE) #keep if town touches the state
@@ -324,12 +338,12 @@ USTigerFeatures <- function(st,workProj4,
     if (!(c == "515" & st == "VA")) {   #Bedford Town not in data?!?
       #spatialPolygon dataframe
       tmpA <- rbind_NULLok(tmpA,
-                           sp::spTransform(tigris::area_water(st,c),workProj4)) 
+                 sp::spTransform(tigris::area_water(st,c,year=year),workProj4)) 
       #spatialLines dataframe
       tmpL <- rbind_NULLok(tmpL,
-                           sp::spTransform(tigris::linear_water(st,c),workProj4)) 
+                 sp::spTransform(tigris::linear_water(st,c,year=year),workProj4)) 
       tmpR <- rbind_NULLok(tmpR,
-                           sp::spTransform(tigris::roads(st,c),workProj4)) 
+                 sp::spTransform(tigris::roads(st,c,year=year),workProj4)) 
     }
   }  
   tmpA$size <- as.numeric(tmpA$AWATER) + as.numeric(tmpA$ALAND)
