@@ -74,7 +74,10 @@
 #'    4=stream/river                       5=named stream/river
 #'    6=named stream/river containing the string "RIV"
 #' @param rglColorScheme name of color scheme from 
-#'     c("default","beach","viridis","plasma")
+#'     c("default","beach","viridis","plasma","terrain","oleron","snow","oslo",
+#'       "desert","""lajolla","niccoli","bright",
+#'       "bing","maptoolkit-topo","nps","apple-iphoto")
+#' @param mapColorDepth number of shades in eacvh color channel for bing map as shading
 #' @param rglNAcolor color used to display NA elevations
 #' @param rglNegcolor color used to display elevations below sea level
 #' @param citycolor color used to display cities
@@ -85,6 +88,11 @@
 #' @param rglSpecular light color for specular light
 #' @param rglDiffuse light color for diffuse light
 #' @param rglAmbient light color for ambient light
+#' @param rglSmooth use Gouraud shading if TRUE
+#' @param rglAlpha alpha value for surface
+#' @param rglAntiAlias antialias points and lines when drawing surface
+#' @param rglTheta coordinate for light source
+#' @param rglPhi coordinate for light source
 #' @param saveRGL save the map to an html file
 #' @param mapoutputdir location for saved html map file
 #' @param outputName name of saved html map
@@ -124,12 +132,18 @@ drawMapRGL <- function(paths=NULL,
                        drawRGL=TRUE,
                        res3dplot=2500,maxElev=3000,vScale=1.5,
                        townLevel=3,roadLevel=4,waterALevel=4,waterLLevel=5,
-                       rglColorScheme="default",
+                       rglColorScheme="default",mapColorDepth=16,
                        rglNAcolor="Blue",rglNegcolor="Red",
                        citycolor="SlateGray",watercolor="Blue",
                        roadcolor="Black",glaciercolor="White",
                        rglShininess=0,
-                       rglSpecular="black", rglDiffuse="white", rglAmbient="white",
+                       rglSpecular="black", rglDiffuse="white", 
+                       rglAmbient="white", rglEmission="black",
+                       rglSmooth=TRUE,
+                       rglAlpha=1.0,
+                       rglAntiAlias=TRUE,
+                       rglTheta=0,
+                       rglPhi=15,
                        saveRGL=FALSE,mapoutputdir=NULL,outputName=NULL,
                        #  CRS, rasterization control
                        workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
@@ -288,7 +302,8 @@ drawMapRGL <- function(paths=NULL,
   # raster(s) already masked by now
 
   print(paste0(elevations@ncols," columns by ",elevations@nrows," rows"))
-  sfact <- ceiling(sqrt(elevations@ncols*elevations@nrows/(res3dplot*res3dplot)))
+  sfact <- ceiling(sqrt((as.double(elevations@ncols)/res3dplot)*
+                        (as.double(elevations@nrows)/res3dplot)))
   print(paste0("scaling raster down by a factor of ",sfact))
   if (sfact > 1)
     print(system.time(
@@ -319,6 +334,11 @@ drawMapRGL <- function(paths=NULL,
                    rglNAcolor=rglNAcolor,rglNegcolor=rglNegcolor,
                    rglShininess=rglShininess,rglSpecular=rglSpecular,
                    rglDiffuse=rglDiffuse,rglAmbient=rglAmbient,
-                   saveRGL=saveRGL,mapoutputdir=mapoutputdir,outputName=outputName) 
+                   rglEmission=rglEmission,
+                   rglSmooth=rglSmooth,rglAlpha=rglAlpha,
+                   rglAntiAlias=rglAntiAlias,rglTheta=rglTheta,
+                   rglPhi=rglPhi,
+                   saveRGL=saveRGL,
+                   mapoutputdir=mapoutputdir,outputName=outputName) 
   return(NULL)
 }

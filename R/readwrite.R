@@ -6,7 +6,7 @@ loadSavedElevData <- function(savedNameVec,rasterDir) {
                        pattern=paste0(st,"elevs[0-9]{,2}.grd"))
     for (fn in fvec) {
       print(paste0("loading ",fn))
-      elevations <- raster(paste0(rasterDir,"/",st,"/",fn))
+      elevations <- raster::raster(paste0(rasterDir,"/",st,"/",fn))
       print(elevations)
       r.list[[j]] <- elevations
       j <- j + 1

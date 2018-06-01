@@ -9,8 +9,10 @@ library(tigris)
 library(sf)
 library(velox)
 library(rmapshaper)
-library(openStreetMap)
+library(OpenStreetMap)
 library(viridis)
+library(scico)
+library(pals)
 
 source("C:/bda/SRTMBilData/R/drawMapRGL.R")
 source("C:/bda/SRTMBilData/R/featuresForElevations.R")
@@ -57,28 +59,30 @@ mapWindow <- NULL
 # mapWindow <- c(-123.2,-122.4,48.3,48.8)     # San Juans
 # mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 
 # mapWindow <- c(-62.0,-59.5,45.4,47.11)      # Cape Breton Island 
+# mapWindow <- c(-123.1,-120.9,36.4,38.4)     # SF Bay
 
-drawMapRGL(USStatevec="MN", #VA,WV
-           CAProvincevec=NULL,
+drawMapRGL(USStatevec=NULL,
+           CAProvincevec="SK",
            mapWindow=mapWindow,
            #rasterFileSetNames="SeattleArea",
            cropbox=cropbox,
-           elevDataSource="Raster",
+           elevDataSource="SRTM",
            featureDataSource="Shapefiles",
            townLevel=3,roadLevel=4,waterALevel=4,waterLLevel=5,
-           vScale=1,maxElev=3000,
-           rglColorScheme="default",
+           vScale=1,maxElev=2500,
+           rglColorScheme="terrain",
            #citycolor="purple",
-           #writeElevFile=TRUE,
+           writeElevFile=TRUE,
            writeFeatureFile=TRUE,
            year=2017,
-           rasterDir=rasterDir,mapDataDir=mapDataDir,
+           rasterDir=rasterDir,
+           mapDataDir=mapDataDir,
            shapefileDir=shapefileDir,includeAllRoads=TRUE,
-           maxrastercells=250000000,saveRGL=TRUE,res3d=2600,
+           maxrastercells=200000000,saveRGL=TRUE,res3d=2500,
            maxRasterize=300000,
            mapoutputdir=mapoutputdir,
-           #rasterFileSetWriteName="SammamishArea",
-           outputName="MN")
+           #rasterFileSetWriteName="SFBay",
+           outputName="SK")
 
 stop()
 elevations <- elevationsToRaster(rasterFileSetName="SK",
@@ -102,25 +106,32 @@ featuresForElevations(rasterFileSetName="WA",
                       maxRasterize=100000,
                       polySimplify=0.0,polyMethod="vis", 
                       polyWeighting=0.85,polySnapInt=0.0001) 
-# mapWindow <- c(-156.80,-155.97,20.50,21.05) # Maui
-# mapWindow <- c(-159.90,-159.15,21.75,22.35) # Kauai 
-# mapWindow <- c(-156.10,-154.75,18.85,20.30) # Big Island
 
-drawMapRGL(USStatevec="HI", 
+##  just plot
+# mapWindow <- c(-122.45,-121.85,37.05,37.65) # Penninsula and South Bay 
+# mapWindow <- c(-123.1,-122.42,37.81,38.25)  # Marin County 
+# mapWindow <- c(-122.5,-121.9,37.6,38.1)     # East Bay
+# mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 
+drawMapRGL(USStatevec="WA",
            CAProvincevec=NULL,
            mapWindow=mapWindow,
-           #rasterFileSetNames="SammamishArea",
-           #cropbox=cropbox,
+           #rasterFileSetNames="SFBay",
+           cropbox=cropbox,
            elevDataSource="Raster",
            featureDataSource="Raster",
-           townLevel=3,roadLevel=3,waterALevel=4,waterLLevel=5,
-           #townLevel=5,roadLevel=4,waterALevel=4,waterLLevel=5,
-           vScale=2.5,maxElev=2000,
-           rglColorScheme="beach",
-           citycolor="red",
+           townLevel=9,roadLevel=4,waterALevel=4,waterLLevel=5,
+           saveRGL=TRUE,
+           res3d=2500,
+           vScale=1.00,maxElev=3000,
+           rglColorScheme="bing",
+           rglAlpha=1.0,rglShininess=0.05,rglAntiAlias=TRUE,
+           rglSmooth=TRUE,
+           #  shininess impacts specular lighting only
+           rglSpecular="black", rglDiffuse="white", 
+           rglAmbient="white", rglEmission="black",
+           citycolor="Magenta",
            rasterDir=rasterDir,
-           saveRGL=TRUE,res3d=2900,
            mapoutputdir=mapoutputdir,
-           outputName="Big Island")
+           outputName="WA - bing")
 
   
