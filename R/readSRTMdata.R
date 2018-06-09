@@ -1,4 +1,4 @@
-loadMapElevData <- function(mapshape,mapDataDir,resstr) {
+loadMapElevData <- function(mapshape,mapDataDir,resstr,noisy=FALSE,silent=FALSE) {
   m.sub <- NULL
   j <- 1
   r.list <- list()
@@ -39,13 +39,13 @@ loadMapElevData <- function(mapshape,mapDataDir,resstr) {
   for (i in 1:length(fn)) {
     if (file.exists(paste0(mapDataDir,"/",fn[[i]]))) {
       cat("\n")
-      print(paste0(mapDataDir,"/",fn[[i]]))
+      if (!silent) print(paste0(mapDataDir,"/",fn[[i]]))
       unzip(paste0(mapDataDir,"/",fn[[i]]),exdir=tempd)
       tmp <- raster(paste0(tempd,"/",rn[[i]],".bil"))
       if (is.null(firstOrigin)) {
-        print(tmp)
+        if (noisy) print(tmp)
         firstOrigin <- raster::origin(tmp)
-        print(firstOrigin)
+        if (noisy) print(firstOrigin)
         firstXWide <- tmp@extent@xmax - tmp@extent@xmin
         firstYWide <- tmp@extent@ymax - tmp@extent@ymin
         firstRows <- nrow(tmp)
@@ -57,8 +57,8 @@ loadMapElevData <- function(mapshape,mapDataDir,resstr) {
           warning("projection mismatch - ",raster::projection(tmp))
       }
       if (!identical(firstRes,raster::res(tmp))) {
-        print("resolution differs from the first tile - resampling")
-        print(raster::res(tmp))
+        if (noisy) print("resolution differs from the first tile - resampling")
+        if (noisy) print(raster::res(tmp))
         ## what raster do we want? - clone first in dims, extent size and offset 
         xwide <- tmp@extent@xmax - tmp@extent@xmin
         ywide <- tmp@extent@ymax - tmp@extent@ymin
@@ -71,9 +71,9 @@ loadMapElevData <- function(mapshape,mapDataDir,resstr) {
                                        extent(llx,llx+firstXWide,
                                               lly,lly+firstYWide))
         raster::origin(newraster) <- firstOrigin
-        print(tmp)  
+        if (noisy) print(tmp)  
         tmp <- raster::resample(tmp, newraster)
-        print(tmp)
+        if (noisy) print(tmp)
       } else {
         if (max(abs(firstOrigin-raster::origin(tmp))) > 0.0000001)  
           warning("origin mismatch - ",raster::origin(tmp)," ",firstOrigin)
@@ -87,15 +87,16 @@ loadMapElevData <- function(mapshape,mapDataDir,resstr) {
       ei <- sp::SpatialPolygons(list(Polygons(list(pgon), ID = "1deg")),
                                 proj4string=CRS("+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs"))
       if (rgeos::gContainsProperly(mapshape, ei)) {
-        print("interior - not masked")
+        if (!silent) print("interior - not masked")
       } else if (rgeos::gIntersects(mapshape, ei)) {
-        print(paste0("boundary - masking time = ",system.time(
-          tmp <- raster::mask(raster::crop(tmp, extent(mapshape),snap="near"),
+        temp <- system.time(
+            tmp <- raster::mask(raster::crop(tmp, extent(mapshape),snap="near"),
                               mapshape)
-        ))[[3]])
-        #print(origin(tmp))
+                 )[[3]]          
+        if (!silent) print(paste0("boundary - masking time = ", temp))
+          
       } else {
-        print("exterior - not used")
+        if (!silent) print("exterior - not used")
         tmp <- NULL
       }
       if (!is.null(tmp)) {
@@ -103,17 +104,17 @@ loadMapElevData <- function(mapshape,mapDataDir,resstr) {
         j <- j + 1
       }
     } else {
-      print(paste0(mapDataDir,"/",fn[[i]]," does not exist, ignored"))
-      unfoundfn <- c(unfoundfn,fn[[i]])
+      if (!silent) print(paste0(mapDataDir,"/",fn[[i]]," does not exist, ignored"))
     }
   }
-  print(warnings())
-  print("calling merge")
+  if (!silent) print(warnings())
   if (j > 2) {
+    if (!silent) print("calling merge")
     #m.sub <- do.call(merge, r.list))
-    print(system.time(
+    temp <- system.time(
       m.sub <- do.call(merge, c(r.list,list(tolerance=0.1)))
-    )[3])  
+    )[3]
+    if (!silent) print(temp)
   } else {
     m.sub <- r.list[[1]]
   }

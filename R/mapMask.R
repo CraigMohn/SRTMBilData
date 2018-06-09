@@ -2,7 +2,7 @@ mapMask <- function(USStatevec=NULL,CAProvincevec=NULL,
                     USParkvec=NULL,worldCountryvec=NULL,
                     mapWindow=NULL,
                     mapbuffer=0,mapmergebuffer=10,
-                    parkdir,
+                    parkDir,
                     workProj4="+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs",
                     year=2017) {
 ##    return a spatial polygon mask for the map 
@@ -31,14 +31,14 @@ mapMask <- function(USStatevec=NULL,CAProvincevec=NULL,
   if (!is.null(USParkvec)) {
     USParkvec <- unique(toupper(USParkvec))
     pfile <- "nps_boundary.shp"
-    parkareas <- sf::st_read(paste0(parkdir,"/",pfile))  # sf dataframe
+    parkareas <- sf::st_read(paste0(parkDir,"/",pfile))  # sf dataframe
     #parkareas <- rgeos::gUnaryUnion(parkareas)
     #  parknames <- parkareas[,c("UNIT_NAME","UNIT_CODE")]
     #  sf::st_geometry(parknames) <- NULL
     #  parknames <- parknames[order(parknames$UNIT_CODE),] 
     #  write.csv(parknames,paste0(datadir,"/parknames.csv"))
-    parkareas <-  sp::spTransform(parkareas[parkareas$UNIT_CODE %in% USParkvec,"geometry"],
-                                  sp::CRS(workProj4)) 
+    parkareas <-  sf::st_transform(parkareas[parkareas$UNIT_CODE %in% USParkvec,"geometry"],
+                                  workProj4) 
     mcrop <- as(parkareas, "Spatial")  
     mapshape <- bufferUnion(mcrop,mapbuffer=mapmergebuffer,mapshape) 
   }

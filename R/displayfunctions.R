@@ -1,7 +1,7 @@
 draw3DMapTrack <- function(mapRaster,trackdf=NULL,
                            featureLevels=c(3,4,4,5), #towns,roads,waterA,waterL
                            maxElev=3000,vScale=1.5,
-                           colors="default",mapColorDepth=16,
+                           rglColorScheme="default",mapColorDepth=16,
                            citycolor="White",roadcolor="Black",
                            watercolor="Blue",glaciercolor="White",
                            rglNAcolor="Blue",rglNegcolor=NA,
@@ -25,11 +25,11 @@ draw3DMapTrack <- function(mapRaster,trackdf=NULL,
   y <- seq(1,length.out=ncol(mmmelev))
   yscale <- yRatio(elevations)
 
-  if (colors %in% c("bing","apple-iphoto","stamen-terrain")) { 
+  if (rglColorScheme %in% c("bing","apple-iphoto","stamen-terrain")) { 
     #  appear dead  "nps","maptoolkit-topo"
     
     mapImage <- getMapImageRaster(elevations,
-                                  mapImageType=colors) 
+                                  mapImageType=rglColorScheme) 
     col <- t(matrix(
              mapply(rgb2hex,as.vector(mapImage[[1]]),
               as.vector(mapImage[[2]]),as.vector(mapImage[[3]]),
@@ -38,7 +38,7 @@ draw3DMapTrack <- function(mapRaster,trackdf=NULL,
              ncol=nrow(mmmelev),nrow=ncol(mmmelev)))
   } else {                           
     #  assign elevation-based colors 
-    terrcolors <- terrainColors(colors,206)
+    tcolors <- terrainColors(rglColorScheme,206)
     tmpelev <- mmmelev/maxElev    #  rescale in terms of maximum
     tmpelev[is.na(tmpelev)] <- 0
     #tmpelev <- sign(tmpelev)*sqrt(abs(tmpelev)) # f(0)=0, f(1)=1, f'(x>0) decreasing, reasonable for x<0 
@@ -48,9 +48,13 @@ draw3DMapTrack <- function(mapRaster,trackdf=NULL,
     colidx[colidx<1] <- 1       #  and at 0
     colidx <- colidx + 5
     colidx[mmmelev == 0]  <- 1
-    col <- terrcolors[colidx]
+    col <- tcolors[colidx]
     if (!is.na(rglNegcolor)) col[mmmelev < -10] <- gplots::col2hex(rglNegcolor)
+  }
+  if (!is.na(rglNAcolor)) {
     col[is.na(mmmelev)] <- gplots::col2hex(rglNAcolor)
+  } else {
+    col[is.na(mmmelev)] <- NA
   }
   mmmelev[is.na(mmmelev)] <- -10    #  have missing elevations slightly below zero
   #  draw cities, water and roads in that order
@@ -143,18 +147,8 @@ draw3DMapTrack <- function(mapRaster,trackdf=NULL,
   return(NULL)
 }
 terrainColors <- function(palettename="default",numshades=206) {
-  if (palettename == "default") {
-    terrcolors <- 
-      colorRampPalette(c("blue","darkturquoise","turquoise","aquamarine",
-                         "palegreen","greenyellow","lawngreen",
-                         "chartreuse","green","springgreen",
-                         "limegreen","forestgreen","darkgreen",
-                         "olivedrab","darkkhaki","darkgoldenrod",
-                         "sienna","brown","saddlebrown","rosybrown",
-                         "gray35","gray45","gray55",
-                         "gray65","gray70","gray75","gray85"))(numshades)
-    
-  } else if (palettename == "beach") {
+  print(palettename)
+  if (palettename == "beach") {
     terrcolors <- 
       colorRampPalette(c("blue","bisque1","bisque2","bisque3",
                          "palegreen","greenyellow","lawngreen",
@@ -185,6 +179,16 @@ terrainColors <- function(palettename="default",numshades=206) {
   } else if (palettename %in% c("bright")) {
     terrcolors <- 
       pals::gnuplot(2*numshades)[floor(3*numshades/5):(floor(3*numshades/5)+numshades)]
+  } else {  #"default"
+    terrcolors <-
+      colorRampPalette(c("blue","darkturquoise","turquoise","aquamarine",
+                         "palegreen","greenyellow","lawngreen",
+                         "chartreuse","green","springgreen",
+                         "limegreen","forestgreen","darkgreen",
+                         "olivedrab","darkkhaki","darkgoldenrod",
+                         "sienna","brown","saddlebrown","rosybrown",
+                         "gray35","gray45","gray55",
+                         "gray65","gray70","gray75","gray85"))(numshades)
   }
   return(terrcolors)
 }
@@ -239,9 +243,9 @@ getMapImageRaster <- function(mapRaster,mapImageType="bing") {
                                 raster::extent(mapRaster)[2],
                                 raster::extent(mapRaster)[3],
                                 raster::extent(mapRaster)[4])/ncol(mapRaster)
-print(paste0("meters/pixel =",metersPerPixel))
+#print(paste0("meters/pixel =",metersPerPixel))
   zoomcalc <- 13 - floor(max(log2(metersPerPixel/20),0))                   
-print(paste0("zoomcalc = ",zoomcalc))
+#print(paste0("zoomcalc = ",zoomcalc))
   print(paste0("downloading ",mapImageType," map tiles"))
   mapImage <- OpenStreetMap::openmap(upperLeft,lowerRight,
                                      zoom=zoomcalc,type=mapImageType) 

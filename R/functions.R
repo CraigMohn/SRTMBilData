@@ -72,4 +72,8 @@ shapes_for_states <- function(statevec,
                          writeShapefiles=TRUE,shapefiledir)
   return("done")
 }
+UTMzone <- function(lon) {
+  #  from stackoverflow answer by Josh O'Brien
+  (floor((lon + 180)/6) %% 60) + 1  # 
+}
 

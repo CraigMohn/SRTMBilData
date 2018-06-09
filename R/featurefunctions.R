@@ -22,9 +22,10 @@ buildFeatureStack <- function(baseLayer,mapshape,
     spRoads$value <- roadRank(spRoads@data[,"TYPE"],
                               spRoads@data[,"NAME"] )      
     spRoads <- spRoads[spRoads$value>=filterVec[2],]
-    rlayer <- shapeToRasterLayer(sxdf=spRoads,
-                                 templateRaster=baseLayer,
-                                 maxRasterize=maxRasterize)
+    if (!is.null(spRoads))
+      rlayer <- shapeToRasterLayer(sxdf=spRoads,
+                                   templateRaster=baseLayer,
+                                   maxRasterize=maxRasterize)
     if (!is.finite(rlayer@data@min)) {
       warning("rlayer mess-up")
       print(rlayer@data@min)
@@ -46,9 +47,10 @@ buildFeatureStack <- function(baseLayer,mapshape,
     spWaterL$value <- waterLRank(spWaterL@data[,"TYPE"],
                                  spWaterL@data[,"NAME"] )      
     spWaterL <- spWaterL[spWaterL$value>=filterVec[4],]
-    wLlayer <- shapeToRasterLayer(sxdf=spWaterL,
-                                  templateRaster=baseLayer,
-                                  maxRasterize=maxRasterize)
+    if (!is.null(spWaterL))
+      wLlayer <- shapeToRasterLayer(sxdf=spWaterL,
+                                    templateRaster=baseLayer,
+                                    maxRasterize=maxRasterize)
     if (!is.finite(wLlayer@data@min)) {
       warning("wLlayer mess-up")
       print(wLlayer@data@min)
@@ -71,13 +73,14 @@ buildFeatureStack <- function(baseLayer,mapshape,
                                   spWaterA@data[,"NAME"],
                                   spWaterA@data[,"size"] )      
     spWaterA <- spWaterA[spWaterA$value>=filterVec[3],]
-    wAlayer <- shapeToRasterLayer(sxdf=spWaterA,
-                                  templateRaster=baseLayer,
-                                  maxRasterize=maxRasterize,
-                                  polySimplify=polySimplify,
-                                  polyMethod=polyMethod,
-                                  polyWeighting=polyWeighting,
-                                  polySnapInt=polySnapInt)
+    if (!is.null(spWaterA))
+      wAlayer <- shapeToRasterLayer(sxdf=spWaterA,
+                                    templateRaster=baseLayer,
+                                    maxRasterize=maxRasterize,
+                                    polySimplify=polySimplify,
+                                    polyMethod=polyMethod,
+                                    polyWeighting=polyWeighting,
+                                    polySnapInt=polySnapInt)
     if (!is.finite(wAlayer@data@min)) {
       warning("wAlayer mess-up")
       print(wAlayer@data@min)
@@ -99,13 +102,14 @@ buildFeatureStack <- function(baseLayer,mapshape,
     spTown$value <- townRank(spTown@data[,"TYPE"],
                              spTown@data[,"NAME"])
     spTown <- spTown[spTown$value>=filterVec[1],]
-    tlayer <- shapeToRasterLayer(sxdf=spTown,
-                                 templateRaster=baseLayer,
-                                 maxRasterize=maxRasterize,
-                                 polySimplify=polySimplify,
-                                 polyMethod=polyMethod,
-                                 polyWeighting=polyWeighting,
-                                 polySnapInt=polySnapInt)
+    if (!is.null(spTown))
+      tlayer <- shapeToRasterLayer(sxdf=spTown,
+                                   templateRaster=baseLayer,
+                                   maxRasterize=maxRasterize,
+                                   polySimplify=polySimplify,
+                                   polyMethod=polyMethod,
+                                   polyWeighting=polyWeighting,
+                                   polySnapInt=polySnapInt)
     if (!is.finite(tlayer@data@min)) {
       warning("tlayer mess-up")
       print(tlayer@data@min)
@@ -122,6 +126,7 @@ buildFeatureStack <- function(baseLayer,mapshape,
   names(s) <- c("town","waterA","waterL","road")  
   return(s)
 }
+
 shapeToRasterLayer <- function(sxdf,templateRaster,
                                maxRasterize=10000,
                                polySimplify=0,polyMethod="vis",
@@ -255,6 +260,7 @@ loadShapeFiles <- function(USStatevec,CAProvincevec,mapshape,
                            shapefileDir,writeShapefiles,
                            shapefileSource="Shapefiles",
                            includeAllRoads=FALSE,
+                           zeroBufferTowns=FALSE,zeroBufferWater=FALSE,
                            year=2017) {
   workProj4 <- raster::crs(mapshape)
   spTown <- NULL
@@ -280,6 +286,22 @@ loadShapeFiles <- function(USStatevec,CAProvincevec,mapshape,
     spRoads <- rbind_NULLok(spRoads,tmp[["spRoads"]])
     spWaterA <- rbind_NULLok(spWaterA,tmp[["spWaterA"]])
     spWaterL <- rbind_NULLok(spWaterL,tmp[["spWaterL"]])
+  }
+  #if (zeroBufferTowns) spTowns <- raster::buffer(spTowns,width=0,dissolve=FALSE)
+  if (zeroBufferTowns) {
+    bufferCRS <- paste0("+proj=utm +zone=",UTMzone((extent(spTown)[1]+extent(spTown)[2])/2),
+                        " +datum=WGS84")
+    spTown <- rgeos::gBuffer(sp::spTransform(spTown, CRS(bufferCRS)),
+                              width=0,byid=TRUE)
+    spTown <- sp::spTransform(spTown , CRS(workProj4))
+  }
+  #if (zeroBufferWater) spWaterA <- raster::buffer(spWaterA,width=0,dissolve=FALSE)
+  if (zeroBufferWater) {
+    bufferCRS <- paste0("+proj=utm +zone=",UTMzone((extent(spWaterA)[1]+extent(spWaterA)[2])/2),
+                        " +datum=WGS84")
+    spWaterA <- rgeos::gBuffer(sp::spTransform(spWaterA, CRS(bufferCRS)),
+                               width=0,byid=TRUE)
+    spWaterA <- sp::spTransform(spWaterA , workProj4)
   }
   #  Don't need to check boundaries - 
   #   saved chunks were appropriately masked/filtered and 

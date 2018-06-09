@@ -61,28 +61,30 @@ mapWindow <- NULL
 # mapWindow <- c(-62.0,-59.5,45.4,47.11)      # Cape Breton Island 
 # mapWindow <- c(-123.1,-120.9,36.4,38.4)     # SF Bay
 
-drawMapRGL(USStatevec=NULL,
-           CAProvincevec="SK",
+drawMapRGL(USStatevec="RI",
+           CAProvincevec=NULL,
            mapWindow=mapWindow,
+           mapbuffer=0,
            #rasterFileSetNames="SeattleArea",
            cropbox=cropbox,
            elevDataSource="SRTM",
            featureDataSource="Shapefiles",
-           townLevel=3,roadLevel=4,waterALevel=4,waterLLevel=5,
-           vScale=1,maxElev=2500,
-           rglColorScheme="terrain",
+           townLevel=9,roadLevel=4,waterALevel=4,waterLLevel=5,
+           vScale=1,maxElev=2000,
+           rglColorScheme="bing",
            #citycolor="purple",
-           writeElevFile=TRUE,
-           writeFeatureFile=TRUE,
+           #writeElevFile=TRUE,
+           #writeFeatureFile=TRUE,
            year=2017,
            rasterDir=rasterDir,
            mapDataDir=mapDataDir,
            shapefileDir=shapefileDir,includeAllRoads=TRUE,
-           maxrastercells=200000000,saveRGL=TRUE,res3d=2500,
+           maxrastercells=300000000,
+           #saveRGL=TRUE,res3d=2400,
            maxRasterize=300000,
            mapoutputdir=mapoutputdir,
            #rasterFileSetWriteName="SFBay",
-           outputName="SK")
+           outputName="MB")
 
 stop()
 elevations <- elevationsToRaster(rasterFileSetName="SK",
@@ -95,14 +97,15 @@ elevations <- elevationsToRaster(rasterFileSetName="SK",
                                resstr="_1arc_v3_bil") 
     
 
-featuresForElevations(rasterFileSetName="WA",
+featuresForElevations(rasterFileSetName="MB",
                       rasterDir=rasterDir,
                       shapefileDir=shapefileDir,
-                      USStatevec="WA",
-                      CAProvincevec=NULL,
-                      featureDataSource="TIGER",
+                      USStatevec=NULL,
+                      CAProvincevec="MB",
+                      featureDataSource="Shapefiles",
                       includeAllRoads=TRUE,
                       workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
+                      zeroBufferWater=TRUE,
                       maxRasterize=100000,
                       polySimplify=0.0,polyMethod="vis", 
                       polyWeighting=0.85,polySnapInt=0.0001) 
@@ -112,26 +115,28 @@ featuresForElevations(rasterFileSetName="WA",
 # mapWindow <- c(-123.1,-122.42,37.81,38.25)  # Marin County 
 # mapWindow <- c(-122.5,-121.9,37.6,38.1)     # East Bay
 # mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 
-drawMapRGL(USStatevec="WA",
+drawMapRGL(USStatevec=NULL,
            CAProvincevec=NULL,
+           #USParkvec=c("MORA"),parkdir=parkdir,mapbuffer=15000,
            mapWindow=mapWindow,
-           #rasterFileSetNames="SFBay",
+           rasterFileSetNames="SFBay",
            cropbox=cropbox,
+           rectangularMap=FALSE,rglNAcolor=NA,
            elevDataSource="Raster",
            featureDataSource="Raster",
            townLevel=9,roadLevel=4,waterALevel=4,waterLLevel=5,
            saveRGL=TRUE,
-           res3d=2500,
-           vScale=1.00,maxElev=3000,
-           rglColorScheme="bing",
-           rglAlpha=1.0,rglShininess=0.05,rglAntiAlias=TRUE,
+           res3d=2400,
+           vScale=1.5,maxElev=3000,
+           rglColorScheme="bing",mapColorDepth=8,
+           rglAlpha=0.0,rglShininess=0.05,rglAntiAlias=TRUE,
            rglSmooth=TRUE,
            #  shininess impacts specular lighting only
            rglSpecular="black", rglDiffuse="white", 
-           rglAmbient="white", rglEmission="black",
-           citycolor="Magenta",
+           rglAmbient="black", rglEmission="black",
+           #citycolor="Magenta",
            rasterDir=rasterDir,
            mapoutputdir=mapoutputdir,
-           outputName="WA - bing")
+           outputName="South Bay")
 
   
