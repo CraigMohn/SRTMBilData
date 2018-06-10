@@ -13,19 +13,20 @@ buildFeatureStack <- function(baseLayer,mapshape,
   #  returns a rasterStack  which has 4 layers which can be stored as ints
   bLrect <- as(raster::extent(baseLayer), "SpatialPolygons")
   sp::proj4string(bLrect) <- sp::proj4string(spTown)
-  if (!is.null(spRoads)) {
+  if (length(spRoads)>0) {
     print("roads")
     spRoads <- sxdfMask(spRoads,bLrect)
   }
-  if (!is.null(spRoads)) {
-    print(paste0(nrow(spRoads)," roads to process"))
-    spRoads$value <- roadRank(spRoads@data[,"TYPE"],
+  if (length(spRoads)>0) {
+   spRoads$value <- roadRank(spRoads@data[,"TYPE"],
                               spRoads@data[,"NAME"] )      
     spRoads <- spRoads[spRoads$value>=filterVec[2],]
-    if (!is.null(spRoads))
-      rlayer <- shapeToRasterLayer(sxdf=spRoads,
-                                   templateRaster=baseLayer,
-                                   maxRasterize=maxRasterize)
+  }
+  if (length(spRoads)>0) {
+    print(paste0(nrow(spRoads)," roads to process"))
+    rlayer <- shapeToRasterLayer(sxdf=spRoads,
+                                 templateRaster=baseLayer,
+                                 maxRasterize=maxRasterize)
     if (!is.finite(rlayer@data@min)) {
       warning("rlayer mess-up")
       print(rlayer@data@min)
@@ -38,19 +39,20 @@ buildFeatureStack <- function(baseLayer,mapshape,
                              vals=0)
     print("no roads to add")
   }
-  if (!is.null(spWaterL)) {
+  if (length(spWaterL)>0) {
     print("water lines")
     spWaterL <- sxdfMask(spWaterL,bLrect)
   }
-  if (!is.null(spWaterL)) {
-    print(paste0(nrow(spWaterL)," water lines to process"))
+  if (length(spWaterL)>0) {
     spWaterL$value <- waterLRank(spWaterL@data[,"TYPE"],
                                  spWaterL@data[,"NAME"] )      
     spWaterL <- spWaterL[spWaterL$value>=filterVec[4],]
-    if (!is.null(spWaterL))
-      wLlayer <- shapeToRasterLayer(sxdf=spWaterL,
-                                    templateRaster=baseLayer,
-                                    maxRasterize=maxRasterize)
+  }
+  if (length(spWaterL)>0) {
+    print(paste0(nrow(spWaterL)," water lines to process"))
+    wLlayer <- shapeToRasterLayer(sxdf=spWaterL,
+                                  templateRaster=baseLayer,
+                                  maxRasterize=maxRasterize)
     if (!is.finite(wLlayer@data@min)) {
       warning("wLlayer mess-up")
       print(wLlayer@data@min)
@@ -63,24 +65,25 @@ buildFeatureStack <- function(baseLayer,mapshape,
                               vals=0)
     print("no water lines to add")
   }
-  if (!is.null(spWaterA)) {
+  if (length(spWaterA)>0) {
     print("water polygons")
     spWaterA <- sxdfMask(spWaterA,bLrect)
   }
-  if (!is.null(spWaterA)) {
-    print(paste0(nrow(spWaterA)," water areas to process"))
+  if (length(spWaterA)>0) {
     spWaterA$value <- waterARank(spWaterA@data[,"TYPE"],
                                   spWaterA@data[,"NAME"],
                                   spWaterA@data[,"size"] )      
     spWaterA <- spWaterA[spWaterA$value>=filterVec[3],]
-    if (!is.null(spWaterA))
-      wAlayer <- shapeToRasterLayer(sxdf=spWaterA,
-                                    templateRaster=baseLayer,
-                                    maxRasterize=maxRasterize,
-                                    polySimplify=polySimplify,
-                                    polyMethod=polyMethod,
-                                    polyWeighting=polyWeighting,
-                                    polySnapInt=polySnapInt)
+  }
+  if (length(spWaterA)>0) {
+    print(paste0(nrow(spWaterA)," water areas to process"))
+    wAlayer <- shapeToRasterLayer(sxdf=spWaterA,
+                                  templateRaster=baseLayer,
+                                  maxRasterize=maxRasterize,
+                                  polySimplify=polySimplify,
+                                  polyMethod=polyMethod,
+                                  polyWeighting=polyWeighting,
+                                  polySnapInt=polySnapInt)
     if (!is.finite(wAlayer@data@min)) {
       warning("wAlayer mess-up")
       print(wAlayer@data@min)
@@ -93,23 +96,24 @@ buildFeatureStack <- function(baseLayer,mapshape,
                               vals=0)
     print("no water polygons to add")
   }
-  if (!is.null(spTown)) {
+  if (length(spTown)>0) {
     print("towns")
     spTown <- sxdfMask(spTown, bLrect)
   }
-  if (!is.null(spTown)) {
-    print(paste0(nrow(spTown)," towns to process"))
+  if (length(spTown)>0) {
     spTown$value <- townRank(spTown@data[,"TYPE"],
                              spTown@data[,"NAME"])
     spTown <- spTown[spTown$value>=filterVec[1],]
-    if (!is.null(spTown))
-      tlayer <- shapeToRasterLayer(sxdf=spTown,
-                                   templateRaster=baseLayer,
-                                   maxRasterize=maxRasterize,
-                                   polySimplify=polySimplify,
-                                   polyMethod=polyMethod,
-                                   polyWeighting=polyWeighting,
-                                   polySnapInt=polySnapInt)
+  }
+  if (length(spTown)>0) {
+    print(paste0(nrow(spTown)," towns to process"))
+    tlayer <- shapeToRasterLayer(sxdf=spTown,
+                                 templateRaster=baseLayer,
+                                 maxRasterize=maxRasterize,
+                                 polySimplify=polySimplify,
+                                 polyMethod=polyMethod,
+                                 polyWeighting=polyWeighting,
+                                 polySnapInt=polySnapInt)
     if (!is.finite(tlayer@data@min)) {
       warning("tlayer mess-up")
       print(tlayer@data@min)
@@ -268,7 +272,7 @@ loadShapeFiles <- function(USStatevec,CAProvincevec,mapshape,
   spWaterA <- NULL
   spWaterL <- NULL
   if (!is.null(USStatevec)) {
-    tmp <- USFeatures(USStatevec=USStatevec,
+    tmp <- USFeatures(USStatevec=expandRegions(unique(toupper(USStatevec)),"US"),
                       workProj4=workProj4,
                       shapefileSource=shapefileSource,
                       shapefileDir=shapefileDir,
@@ -281,25 +285,25 @@ loadShapeFiles <- function(USStatevec,CAProvincevec,mapshape,
     spWaterL <- rbind_NULLok(spWaterL,tmp[["spWaterL"]])
   }
   if (!is.null(CAProvincevec)) {
-    tmp <- CAFeatures(CAProvincevec,workProj4,shapefileDir)
+    tmp <- CAFeatures(CAProvincevec=expandRegions(unique(toupper(CAProvincevec)),"CANADA"),
+                      workProj4=workProj4,
+                      shapefileDir=shapefileDir)
     spTown <- rbind_NULLok(spTown,tmp[["spTown"]])
     spRoads <- rbind_NULLok(spRoads,tmp[["spRoads"]])
     spWaterA <- rbind_NULLok(spWaterA,tmp[["spWaterA"]])
     spWaterL <- rbind_NULLok(spWaterL,tmp[["spWaterL"]])
   }
-  #if (zeroBufferTowns) spTowns <- raster::buffer(spTowns,width=0,dissolve=FALSE)
   if (zeroBufferTowns) {
-    bufferCRS <- paste0("+proj=utm +zone=",UTMzone((extent(spTown)[1]+extent(spTown)[2])/2),
-                        " +datum=WGS84")
-    spTown <- rgeos::gBuffer(sp::spTransform(spTown, CRS(bufferCRS)),
+    bufferProj4 <- UTMProj4(lon=(extent(spTown)[1]+extent(spTown)[2])/2,
+                            lat=(extent(spTown)[3]+extent(spTown)[4])/2)
+    spTown <- rgeos::gBuffer(sp::spTransform(spTown, CRS(bufferProj4)),
                               width=0,byid=TRUE)
     spTown <- sp::spTransform(spTown , CRS(workProj4))
   }
-  #if (zeroBufferWater) spWaterA <- raster::buffer(spWaterA,width=0,dissolve=FALSE)
   if (zeroBufferWater) {
-    bufferCRS <- paste0("+proj=utm +zone=",UTMzone((extent(spWaterA)[1]+extent(spWaterA)[2])/2),
-                        " +datum=WGS84")
-    spWaterA <- rgeos::gBuffer(sp::spTransform(spWaterA, CRS(bufferCRS)),
+    bufferProj4 <- UTMProj4(lon=(extent(spWaterA)[1]+extent(spWaterA)[2])/2,
+                            lat=(extent(spWaterA)[3]+extent(spWaterA)[4])/2)
+    spWaterA <- rgeos::gBuffer(sp::spTransform(spWaterA, CRS(bufferProj4)),
                                width=0,byid=TRUE)
     spWaterA <- sp::spTransform(spWaterA , workProj4)
   }

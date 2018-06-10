@@ -61,30 +61,30 @@ mapWindow <- NULL
 # mapWindow <- c(-62.0,-59.5,45.4,47.11)      # Cape Breton Island 
 # mapWindow <- c(-123.1,-120.9,36.4,38.4)     # SF Bay
 
-drawMapRGL(USStatevec="RI",
-           CAProvincevec=NULL,
+drawMapRGL(USStatevec="NewEngland",
+           #CAProvincevec="Maritimes",
            mapWindow=mapWindow,
            mapbuffer=0,
-           #rasterFileSetNames="SeattleArea",
+           rasterFileSetNames="NewEngland",
            cropbox=cropbox,
            elevDataSource="SRTM",
            featureDataSource="Shapefiles",
-           townLevel=9,roadLevel=4,waterALevel=4,waterLLevel=5,
-           vScale=1,maxElev=2000,
-           rglColorScheme="bing",
+           townLevel=5,roadLevel=4,waterALevel=4,waterLLevel=5,
+           vScale=1,maxElev=2500,
+           rglColorScheme="default",
            #citycolor="purple",
-           #writeElevFile=TRUE,
-           #writeFeatureFile=TRUE,
+           writeElevFile=TRUE,
+           writeFeatureFile=TRUE,
            year=2017,
            rasterDir=rasterDir,
            mapDataDir=mapDataDir,
            shapefileDir=shapefileDir,includeAllRoads=TRUE,
-           maxrastercells=300000000,
+           maxrastercells=200000000,
            #saveRGL=TRUE,res3d=2400,
-           maxRasterize=300000,
+           maxRasterize=200000,
            mapoutputdir=mapoutputdir,
-           #rasterFileSetWriteName="SFBay",
-           outputName="MB")
+           rasterFileSetWriteName="NewEngland",
+           outputName="New England")
 
 stop()
 elevations <- elevationsToRaster(rasterFileSetName="SK",

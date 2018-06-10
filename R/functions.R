@@ -72,8 +72,13 @@ shapes_for_states <- function(statevec,
                          writeShapefiles=TRUE,shapefiledir)
   return("done")
 }
+UTMProj4 <- function(lon,lat) {
+  hemisphere <- ifelse(lat > 0,"+north","+south")
+  return(paste0("+proj=utm +zone=",UTMzone(lon)," ",hemisphere,
+         " +ellps=WGS84 +datum=WGS84"))
+}
 UTMzone <- function(lon) {
   #  from stackoverflow answer by Josh O'Brien
-  (floor((lon + 180)/6) %% 60) + 1  # 
+  return((floor((lon + 180)/6) %% 60) + 1) 
 }
 

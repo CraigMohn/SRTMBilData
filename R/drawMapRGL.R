@@ -315,10 +315,6 @@ drawMapRGL <- function(paths=NULL,
     spRoads <- tmp[["spRoads"]]
     spWaterA <- tmp[["spWaterA"]]
     spWaterL <- tmp[["spWaterL"]]
-    #if (!is.null(spTown)) plot(spTown)
-    #if (!is.null(spRoads)) plot(spRoads)
-    #if (!is.null(spWaterA)) plot(spWaterA)
-    #if (!is.null(spWaterL)) plot(spWaterL)
   } else {
     spTown <- NULL
     spRoads <- NULL

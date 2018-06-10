@@ -122,7 +122,9 @@ featuresForElevations <- function(rasterFileSetName,
                       workProj4=workProj4,year=year)
   plot(mapshape)
   #   get shapefiles from State and Province vecs
-  tmp <- loadShapeFiles(USStatevec,CAProvincevec,mapshape=mapshape,
+  tmp <- loadShapeFiles(USStatevec=USStatevec,
+                        CAProvincevec=CAProvincevec,
+                        mapshape=mapshape,
                         shapefileDir=shapefileDir,
                         writeShapefiles=writeShapefiles,
                         shapefileSource=featureDataSource,
