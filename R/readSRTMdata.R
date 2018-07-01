@@ -1,112 +1,113 @@
-loadMapElevData <- function(mapshape,mapDataDir,resstr,noisy=FALSE,silent=FALSE) {
+loadMapElevData <- function(mapshape,mapDataDir,resstr,
+                            noisy=TRUE,silent=FALSE,
+                            latLimit=59) {
   m.sub <- NULL
   j <- 1
   r.list <- list()
   mapextent <- raster::extent(mapshape)
-  print(mapextent)
-  ELonMin <- floor(max(mapextent@xmin,0))
-  ELonMax <- floor(max(mapextent@xmax,0))
-  WLonMin <- ceiling(max(-mapextent@xmax,0))
-  WLonMax <- ceiling(max(-mapextent@xmin,0))
+  if (!silent) print(mapextent)
+
   NLatMin <- floor(max(mapextent@ymin,0))
   NLatMax <- floor(max(mapextent@ymax,0))
   SLatMin <- ceiling(max(-mapextent@ymax,0))
   SLatMax <- ceiling(max(-mapextent@ymin,0))
-  
-  fn <- NULL
-  if (NLatMax > 0) {
-    if (WLonMax > 0) {
-      fn <- addmapfiles(fn,"w",WLonMin,WLonMax,"n",NLatMin,NLatMax,resstr)
-    }
-    if (ELonMax > 0) {
-      fn <- addmapfiles(fn,"e",ELonMin,ELonMax,"n",NLatMin,NLatMax,resstr)
-    }
-  }
-  if (SLatMax > 0) {
-    if (WLonMax > 0) {
-      fn <- addmapfiles(fn,"w",WLonMin,WLonMax,"s",SLatMin,SLatMax,resstr)
-    }
-    if (ELonMax > 0) {
-      fn <- addmapfiles(fn,"e",ELonMin,ELonMax,"s",SLatMin,SLatMax,resstr)
-    }
-  }
-  tempd <- tempdir()
-  rn <- gsub("_bil","",tools::file_path_sans_ext(fn))
+
+  if (!is.null(mapDataDir))tempd <- tempdir()
   unfoundfn <- NULL
   firstRes <- NULL
   firstProj <- NULL
   firstOrigin <- NULL
-  for (i in 1:length(fn)) {
-    if (file.exists(paste0(mapDataDir,"/",fn[[i]]))) {
-      cat("\n")
-      if (!silent) print(paste0(mapDataDir,"/",fn[[i]]))
-      unzip(paste0(mapDataDir,"/",fn[[i]]),exdir=tempd)
-      tmp <- raster(paste0(tempd,"/",rn[[i]],".bil"))
-      if (is.null(firstOrigin)) {
-        if (noisy) print(tmp)
-        firstOrigin <- raster::origin(tmp)
-        if (noisy) print(firstOrigin)
-        firstXWide <- tmp@extent@xmax - tmp@extent@xmin
-        firstYWide <- tmp@extent@ymax - tmp@extent@ymin
-        firstRows <- nrow(tmp)
-        firstCols <- ncol(tmp)
-        firstProj <- raster::projection(tmp)
-        firstRes <- raster::res(tmp)
-      } else {
-        if (raster::projection(tmp)!=firstProj) 
-          warning("projection mismatch - ",raster::projection(tmp))
-      }
-      if (!identical(firstRes,raster::res(tmp))) {
-        if (noisy) print("resolution differs from the first tile - resampling")
-        if (noisy) print(raster::res(tmp))
-        ## what raster do we want? - clone first in dims, extent size and offset 
-        xwide <- tmp@extent@xmax - tmp@extent@xmin
-        ywide <- tmp@extent@ymax - tmp@extent@ymin
-        llx <- tmp@extent@xmin - (firstXWide-xwide)/2
-        lly <- tmp@extent@ymin - (firstYWide-ywide)/2
-        newraster <- tmp
-        raster::ncol(newraster) <- firstCols
-        raster::nrow(newraster) <- firstRows
-        newraster <- raster::setExtent(newraster,
-                                       extent(llx,llx+firstXWide,
-                                              lly,lly+firstYWide))
-        raster::origin(newraster) <- firstOrigin
-        if (noisy) print(tmp)  
-        tmp <- raster::resample(tmp, newraster)
-        if (noisy) print(tmp)
-      } else {
-        if (max(abs(firstOrigin-raster::origin(tmp))) > 0.0000001)  
-          warning("origin mismatch - ",raster::origin(tmp)," ",firstOrigin)
-      }
-      xmin <- tmp@extent@xmin
-      xmax <- tmp@extent@xmax
-      ymin <- tmp@extent@ymin
-      ymax <- tmp@extent@ymax
-      pgon <- sp::Polygon(cbind(c(xmin,xmax,xmax,xmin,xmin),
-                                c(ymin,ymin,ymax,ymax,ymin)))
+  #  loop over N hemisphere from equator, then S from equator (highest res data there)
+  latseq <- NULL
+  if (NLatMax>0) latseq <- seq(from=NLatMin,to=min(NLatMax,latLimit))
+  if (SLatMax>0) latseq <- c(latseq,-seq(from=(SLatMin+1),to=min(SLatMax,latLimit)))
+  lonseq <- seq(from=floor(mapextent@xmin),to=floor(mapextent@xmax))
+
+  for (lat in latseq) {
+    for (lon in lonseq) {
+      pgon <- sp::Polygon(cbind(c(lon,(lon+1),(lon+1),lon,lon),
+                                c(lat,lat,(lat+1),(lat+1),lat)))
       ei <- sp::SpatialPolygons(list(Polygons(list(pgon), ID = "1deg")),
-                                proj4string=CRS("+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs"))
-      if (rgeos::gContainsProperly(mapshape, ei)) {
-        if (!silent) print("interior - not masked")
-      } else if (rgeos::gIntersects(mapshape, ei)) {
-        temp <- system.time(
-            tmp <- raster::mask(raster::crop(tmp, extent(mapshape),snap="near"),
-                              mapshape)
-                 )[[3]]          
-        if (!silent) print(paste0("boundary - masking time = ", temp))
-          
+                                proj4string=CRS(sp::proj4string(mapshape)))
+                                #proj4string=CRS("+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs"))
+      if (rgeos::gIntersects(mapshape, ei)) {
+        if (is.null(mapDataDir)) {
+          #  need to fix to handle no tile returned
+          if (!silent) print(paste0(" ",lat," , ",lon))
+          tmp <- getData("SRTM",lon=floor(lon)+0.5,lat=floor(lat)+0.5)
+        } else {
+          fname <- mapfilename(lat,lon,resstr)
+          if (file.exists(paste0(mapDataDir,"/",fname))) {
+            # cat("\n")
+            if (!silent) print(paste0(mapDataDir,"/",fname))
+            unzip(paste0(mapDataDir,"/",fname),exdir=tempd)
+            rname <- gsub("_bil","",tools::file_path_sans_ext(fname))
+            tmp <- raster(paste0(tempd,"/",rname,".bil"))
+          } else {
+            if (!silent) print(paste0(mapDataDir,"/",fname," does not exist, ignored"))
+            tmp <- NULL
+          }
+        }
+        if (!is.null(tmp)) {
+          if (is.null(firstOrigin)) {
+            firstRaster <- tmp
+            if (noisy) print(tmp)
+            firstOrigin <- raster::origin(tmp)
+            if (noisy) print(firstOrigin)
+            firstXWide <- tmp@extent@xmax - tmp@extent@xmin
+            firstYWide <- tmp@extent@ymax - tmp@extent@ymin
+            firstRows <- nrow(tmp)
+            firstCols <- ncol(tmp)
+            firstProj <- raster::projection(tmp)
+            firstRes <- raster::res(tmp)
+          } else {
+            if (raster::projection(tmp)!=firstProj) 
+              warning("projection mismatch - ",raster::projection(tmp))
+          }
+          if (!raster::compareRaster(firstRaster,tmp,
+                                     res=TRUE,rowcol=FALSE,
+                                     extent=FALSE,orig=FALSE,
+                                     stopiffalse=FALSE)) {
+            if (noisy) print("resolution differs from the first tile - resampling")
+            if (noisy) print(raster::res(tmp))
+            ## what raster do we want? - clone first in dims, extent size and offset 
+            xwide <- tmp@extent@xmax - tmp@extent@xmin
+            ywide <- tmp@extent@ymax - tmp@extent@ymin
+            llx <- tmp@extent@xmin - (firstXWide-xwide)/2
+            lly <- tmp@extent@ymin - (firstYWide-ywide)/2
+            newraster <- tmp
+            raster::ncol(newraster) <- firstCols
+            raster::nrow(newraster) <- firstRows
+            newraster <- raster::setExtent(newraster,
+                                           extent(llx,llx+firstXWide,
+                                                  lly,lly+firstYWide))
+            raster::origin(newraster) <- firstOrigin
+            if (noisy) print(tmp)  
+            tmp <- raster::resample(tmp, newraster)
+            if (noisy) print(tmp)
+          } else {
+            if (max(abs(firstOrigin-raster::origin(tmp))) > 0.0000001)  
+              warning("origin mismatch - ",raster::origin(tmp)," ",firstOrigin)
+          }
+          if (!rgeos::gContainsProperly(mapshape, ei)) {
+            temp <- system.time(
+              tmp <- raster::mask(raster::crop(tmp, extent(mapshape),snap="near"),
+                                  mapshape)
+            )[[3]]          
+            if (!silent) print(paste0("  boundary - masking time = ", temp))
+          } else {
+            if (!silent) print("  interior - not masked")
+          }        
+          r.list[[j]] <- tmp
+          j <- j + 1
+        } else {
+          # no tile where expected
+        }
       } else {
-        if (!silent) print("exterior - not used")
-        tmp <- NULL
+        print(paste0(  "lat=",lat," lon=",lon,"  exterior"))
       }
-      if (!is.null(tmp)) {
-        r.list[[j]] <- tmp
-        j <- j + 1
-      }
-    } else {
-      if (!silent) print(paste0(mapDataDir,"/",fn[[i]]," does not exist, ignored"))
-    }
-  }
+    }  
+  }     
   if (!silent) print(warnings())
   if (j > 2) {
     if (!silent) print("calling merge")
@@ -120,19 +121,11 @@ loadMapElevData <- function(mapshape,mapDataDir,resstr,noisy=FALSE,silent=FALSE)
   }
   return(m.sub)
 }
-addmapfiles <- function(filenames,lonChar,minLon,maxLon,latChar,minLat,maxLat,
-                        resstr="_1arc_v3_bil") {
-  #  first pass assume N and W quartersphere
-  if (minLat <= maxLat) {
-    for (lat in seq(minLat,maxLat)) {
-      if (minLon <= maxLon) {
-        for (lon in seq(minLon,maxLon))
-          filenames <- c(filenames,
-                         paste0(latChar,sprintf("%02d",lat),"_",
-                                lonChar,sprintf("%03d",lon),
-                                resstr,".zip"))
-      }
-    }
-  }
-  return(filenames)  
+mapfilename <- function(lat,lon,resstr) {
+  latChar <- ifelse(lat>=0,"n","s")
+  lonChar <- ifelse(lon>=0,"e","w")
+  return( paste0(latChar,sprintf("%02d",abs(lat)),"_",
+                 lonChar,sprintf("%03d",abs(lon)),
+                 resstr,".zip") )
 }
+

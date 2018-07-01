@@ -60,29 +60,6 @@ loadSavedFeatureData <- function(savedNameVec,rasterDir,
   names(rStack) <- lnames
   return(rStack)
 }
-readShapeFiles <- function(stname,shapefileDir,workProj4,
-                           noisy=FALSE,silent=FALSE) {
-  if (!silent) print(paste0("loading shapefiles for ",stname))
-  tmp <- raster::shapefile(paste0(shapefileDir,"/",stname,
-                                  "Town.shp")) # SpatialPolygonsDF
-  tmp <- sp::spTransform(tmp,workProj4)
-  spTown <- tmp
-  tmp <- raster::shapefile(paste0(shapefileDir,"/",stname,
-                                  "Roads.shp")) # SpatialLinesDF
-  tmp <- sp::spTransform(tmp,workProj4)
-  spRoads <- tmp
-  tmp <- raster::shapefile(paste0(shapefileDir,"/",stname,
-                                  "WaterA")) # SpatialPolygonsDF
-  tmp <- sp::spTransform(tmp,workProj4)
-  spWaterA <- tmp
-  tmp <- raster::shapefile(paste0(shapefileDir,"/",stname,
-                                  "WaterL")) # SpatialLinesDF
-  tmp <- sp::spTransform(tmp,workProj4)
-  spWaterL <- tmp
-  if (!silent) print("done loading shapefiles")
-  return(list(spTown=spTown,spRoads=spRoads,spWaterA=spWaterA,spWaterL=spWaterL))
-}
-
 writeElevRaster <- function(elevations,maxrastercells,rasterDir,fname,
                             noisy=FALSE,silent=FALSE) {
   dir.create(file.path(rasterDir, fname))

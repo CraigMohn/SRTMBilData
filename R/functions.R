@@ -27,6 +27,13 @@ rbind_NULLok <- function(a,b) {
     return(rbind(a,b))
   }
 }
+rbindList <- function(spListA,spListB) {
+  out <- list()
+  for (x in union(names(spListA),names(spListB))) {
+    out[[x]] <- rbind_NULLok(spListA[[x]],spListB[[x]])
+  }
+  return(out)
+}
 doubleExtent <- function(objectWithExtent) {
   bb <- sp::bbox(objectWithExtent)
   return(extent(max(-180,(3*bb[1,1]-bb[1,2])/2),
@@ -80,5 +87,11 @@ UTMProj4 <- function(lon,lat) {
 UTMzone <- function(lon) {
   #  from stackoverflow answer by Josh O'Brien
   return((floor((lon + 180)/6) %% 60) + 1) 
+}
+CRS_LambertAzimuthalEqualArea <- function() {
+  "+proj=laea +lat_0=45 +lon_0=-100 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
+}
+CRS_AlbersEqualArea <- function() {
+  "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs "
 }
 

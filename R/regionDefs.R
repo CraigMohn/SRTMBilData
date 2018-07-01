@@ -34,7 +34,7 @@ expandRegions <- function(invec,country) {
 # mapWindow <- c(-156.10,-154.75,18.85,20.30) # Big Island - red
 # mapWindow <- c(-158.30,-157.60,21.20,21.75) # Oahu - gold
 
-# mapWindow <- c(-123,-121.6,46.75,48.1)      # Seattle Area 
+# mapWindow <- c(-123.25,-121.5,46.75,48.1)   # Seattle Area 
 # mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 
 # mapWindow <- c(-122.4,-122.1,47.5,47.8)     # Lake Wash Area 
 # mapWindow <- c(-123.2,-122.4,48.3,48.8)     # San Juans
@@ -48,7 +48,7 @@ expandRegions <- function(invec,country) {
 # mapWindow <- c(-81.0,-80.0,36.9,37.6)       # Giles Cty/Blacksburg Area 
 # mapWindow <- c(-62.0,-59.5,45.4,47.11)      # Cape Breton Island 
 
-# mapWindow <- c(144.25,149.1,-43.82,-39.65)  # Tasmania 
+# mapWindow <- c(144.25,148.8,-43.75,-39.4)   # Tasmania 
 # mapWindow <- c(145.75,145.95,-41.7,-41.5)   # Cradle Mountain 
 # mapWindow <- c(130.6,131.1,-25.4,-25.2)     # Uluru and The Olgas 
 

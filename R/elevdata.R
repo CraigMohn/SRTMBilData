@@ -1,23 +1,26 @@
 library(tidyverse)
 library(raster)
-library(htmlwidgets)
-library(rgl)
 library(sp)
 library(rgdal)
 library(rgeos)
 library(tigris)
 library(sf)
 library(velox)
+library(cleangeo)
 library(rmapshaper)
 library(OpenStreetMap)
 library(viridis)
 library(scico)
 library(pals)
+library(htmlwidgets)
+library(rgl)
 
 source("C:/bda/SRTMBilData/R/drawMapRGL.R")
 source("C:/bda/SRTMBilData/R/featuresForElevations.R")
 source("C:/bda/SRTMBilData/R/functions.R")
+source("C:/bda/SRTMBilData/R/shapefilefunctions.R")
 source("C:/bda/SRTMBilData/R/featurefunctions.R")
+source("C:/bda/SRTMBilData/R/filterFeatures.R")
 source("C:/bda/SRTMBilData/R/displayfunctions.R")
 source("C:/bda/SRTMBilData/R/mapMask.R")
 source("C:/bda/SRTMBilData/R/readwrite.R")
@@ -29,7 +32,7 @@ mapLibSelector <- 1  # 1=northAmerica+NE Pacific 1s, 2=Europe 3s, 3=Australia 1s
 #USStatevec <- c("WA") #  c("MountainWest","CA","NM","AZ")
 #USParkvec <- c("CANY","CEBR","BRCA","ARCH") 
 #CAProvincevec <- "BC" # c("BC","AB","SK")
-#worldCountryvec <-  c("DEU","AUT","CZE","CHE","FRA") #NULL # <- c("ESP","PRT","FRA") # http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html
+#worldCountryvec <- c("NOR","SWE") #c("DEU","AUT","CZE","CHE","FRA") #NULL # <- c("ESP","PRT","FRA") # http://kirste.userpage.fu-berlin.de/diverse/doc/ISO_3166.html
 
 cropbox <- NULL
 #cropbox <- c(-180, 170, -50, 60)
@@ -59,54 +62,60 @@ mapWindow <- NULL
 # mapWindow <- c(-123.2,-122.4,48.3,48.8)     # San Juans
 # mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 
 # mapWindow <- c(-62.0,-59.5,45.4,47.11)      # Cape Breton Island 
-# mapWindow <- c(-123.1,-120.9,36.4,38.4)     # SF Bay
+mapWindow <- c(-123.1,-120.9,36.4,38.4)     # SF Bay
 
-drawMapRGL(USStatevec="NewEngland",
-           #CAProvincevec="Maritimes",
+drawMapRGL(USStatevec="DE",
+           CAProvincevec=NULL,
+           #worldCountryvec=c("NOR","SWE","DNK") ,
            mapWindow=mapWindow,
            mapbuffer=0,
-           rasterFileSetNames="NewEngland",
+           #rasterFileSetNames="NewEngland",
            cropbox=cropbox,
-           elevDataSource="SRTM",
+           elevDataSource="Raster",
            featureDataSource="Shapefiles",
-           townLevel=5,roadLevel=4,waterALevel=4,waterLLevel=5,
-           vScale=1,maxElev=2500,
-           rglColorScheme="default",
+           townLevel=9,roadLevel=3,waterALevel=4,waterLLevel=5,
+           vScale=0.66,maxElev=3500,
+           rglColorScheme="bing",
            #citycolor="purple",
-           writeElevFile=TRUE,
-           writeFeatureFile=TRUE,
+           #writeElevFile=TRUE,
+           #writeFeatureFile=TRUE,
            year=2017,
            rasterDir=rasterDir,
            mapDataDir=mapDataDir,
            shapefileDir=shapefileDir,includeAllRoads=TRUE,
-           maxrastercells=200000000,
-           #saveRGL=TRUE,res3d=2400,
-           maxRasterize=200000,
+           maxrastercells=300000000,
+           saveRGL=TRUE,
+           res3d=2400,
+           maxRasterize=200000,zeroBufferWater=TRUE,zeroBufferTowns=TRUE,
+           #drawProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
+           drawProj4="Lambert",
            mapoutputdir=mapoutputdir,
-           rasterFileSetWriteName="NewEngland",
-           outputName="New England")
+           #rasterFileSetWriteName="NSTest",
+           outputName="DE",
+           noisy=TRUE)
 
 stop()
-elevations <- elevationsToRaster(rasterFileSetName="SK",
-                               USStatevec=NULL,CAProvincevec="SK",
+elevations <- elevationsToRaster(rasterFileSetName="ON",
+                               USStatevec=NULL,CAProvincevec="ON",
                                cropbox=cropbox,
                                rasterDir=rasterDir,mapDataDir=mapDataDir,
                                mapbuffer=0,mapmergebuffer=0,
-                               maxrastercells=250000000,
+                               maxrastercells=325000000,
                                workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
                                resstr="_1arc_v3_bil") 
     
 
-featuresForElevations(rasterFileSetName="MB",
+featuresForElevations(rasterFileSetName="ON",
                       rasterDir=rasterDir,
                       shapefileDir=shapefileDir,
                       USStatevec=NULL,
-                      CAProvincevec="MB",
+                      CAProvincevec="ON",
                       featureDataSource="Shapefiles",
                       includeAllRoads=TRUE,
                       workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
-                      zeroBufferWater=TRUE,
+                      zeroBufferWater=TRUE,zeroBufferTowns=TRUE,
                       maxRasterize=100000,
+                      sliceFeatureBuffer=1000,
                       polySimplify=0.0,polyMethod="vis", 
                       polyWeighting=0.85,polySnapInt=0.0001) 
 
@@ -115,28 +124,32 @@ featuresForElevations(rasterFileSetName="MB",
 # mapWindow <- c(-123.1,-122.42,37.81,38.25)  # Marin County 
 # mapWindow <- c(-122.5,-121.9,37.6,38.1)     # East Bay
 # mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 
-drawMapRGL(USStatevec=NULL,
+mapWindow <- c(-123.25,-121.5,46.75,48.1)   # Seattle Area 
+drawMapRGL(USStatevec="WA",
            CAProvincevec=NULL,
-           #USParkvec=c("MORA"),parkdir=parkdir,mapbuffer=15000,
+           USParkvec=c("MORA"),parkdir=parkdir,mapbuffer=15000,
+           shapefileDir=shapefileDir,
            mapWindow=mapWindow,
-           rasterFileSetNames="SFBay",
+           rasterFileSetNames="WA",
            cropbox=cropbox,
-           rectangularMap=FALSE,rglNAcolor=NA,
+           rectangularMap=TRUE,
            elevDataSource="Raster",
-           featureDataSource="Raster",
-           townLevel=9,roadLevel=4,waterALevel=4,waterLLevel=5,
+           featureDataSource="Shapefiles",
+           townLevel=3,roadLevel=3,waterALevel=4,waterLLevel=5,
            saveRGL=TRUE,
            res3d=2400,
-           vScale=1.5,maxElev=3000,
-           rglColorScheme="bing",mapColorDepth=8,
-           rglAlpha=0.0,rglShininess=0.05,rglAntiAlias=TRUE,
+           vScale=1.5,maxElev=3500,
+           rglColorScheme="default",mapColorDepth=16,
+           rglAlpha=1.0,rglShininess=0.1,rglAntiAlias=TRUE,
+           rglNAcolor=NA,
            rglSmooth=TRUE,
            #  shininess impacts specular lighting only
            rglSpecular="black", rglDiffuse="white", 
-           rglAmbient="black", rglEmission="black",
+           rglAmbient="white", rglEmission="black",
            #citycolor="Magenta",
            rasterDir=rasterDir,
+           drawProj4="UTM",
            mapoutputdir=mapoutputdir,
-           outputName="South Bay")
+           outputName="MORA UTM shape")
 
   

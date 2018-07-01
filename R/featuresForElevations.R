@@ -89,7 +89,9 @@ elevationsToRaster <- function(rasterFileSetName="default",
 #' @param mapmergebuffer numeric value to expand components of the 
 #'    map defined before merging, to eliminate gaps from minor
 #'    boundary inconsistencies
-#' @param maxRasterize number of items for calls to velox$rasterize
+#' @param sliceFeatureBuffer numeric value to expand the extent of the area
+#'    used to estrict features befire rasterization
+#' @param polyClean fix topology errors
 #' @param polySimplify amount of polygon simplification, see help
 #'    for rmapshaper::ms_simplify 
 #' @param polyMethod simplification method either "vis" or "dp"
@@ -110,7 +112,9 @@ featuresForElevations <- function(rasterFileSetName,
                                   zeroBufferWater=FALSE,
                                   workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
                                   mapbuffer=0,mapmergebuffer=0,
+                                  sliceFeatureBuffer=0,
                                   maxRasterize=100000,
+                                  polyClean=FALSE,
                                   polySimplify=0.0,polyMethod="vis", 
                                   polyWeighting=0.85,polySnapInt=0.0001,...) {
   #   build mapshape
@@ -122,7 +126,7 @@ featuresForElevations <- function(rasterFileSetName,
                       workProj4=workProj4,year=year)
   plot(mapshape)
   #   get shapefiles from State and Province vecs
-  tmp <- loadShapeFiles(USStatevec=USStatevec,
+  spList <- loadShapeFiles(USStatevec=USStatevec,
                         CAProvincevec=CAProvincevec,
                         mapshape=mapshape,
                         shapefileDir=shapefileDir,
@@ -132,12 +136,12 @@ featuresForElevations <- function(rasterFileSetName,
                         year=year,
                         zeroBufferTowns=zeroBufferTowns,
                         zeroBufferWater=zeroBufferWater)
-  spTown <- tmp[["spTown"]]
-  spRoads <- tmp[["spRoads"]]
-  spWaterA <- tmp[["spWaterA"]]
   spWaterL <- tmp[["spWaterL"]]
-  
-
+  spRoads <- tmp[["spRoads"]]
+  if (polyClean) {
+    spList[["spWaterA"]] <- cleangeo::clgeo_Clean(spList[["spWaterA"]])
+    spTown[["spTown"]] <- cleangeo::clgeo_Clean(spList[["spTown"]])
+  } 
   fvec <- list.files(path=paste0(rasterDir,"/",rasterFileSetName),
                      pattern=paste0(rasterFileSetName,"elevs[0-9]{,2}.grd"))
   for (fn in fvec) {
@@ -147,9 +151,9 @@ featuresForElevations <- function(rasterFileSetName,
     print(paste0("loading ",fn))
     elevations <- raster(paste0(rasterDir,"/",rasterFileSetName,"/",fn))
     featureStack <- buildFeatureStack(elevations,mapshape=mapshape,
-                                      spTown=spTown,spWaterA=spWaterA,
-                                      spWaterL=spWaterL,spRoads=spRoads,
+                                      spList=spList,
                                       maxRasterize=maxRasterize,
+                                      sliceFeatureBuffer=sliceFeatureBuffer,
                                       polySimplify=polySimplify,
                                       polyMethod=polyMethod, 
                                       polyWeighting=polyWeighting,

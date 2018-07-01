@@ -45,7 +45,11 @@ tmpr <- sp::SpatialLinesDataFrame(tmpr,data=rdata)
 ### areal water spdf
 tmpa <- raster::shapefile(paste0(datadir,"/CanadaShapefiles/Lakes+RiversPolygons/",
                                  "lhy_000c16a_e.shp")) 
+tmpa <- rbind(tmpa,
+              raster::shapefile(paste0(datadir,"/CanadaShapefiles/Coastline/",
+                                "lhy_000h16a_e_cleaned.shp")))
 colnames(tmpa@data) <- sub("FULLNAME","NAME",colnames(tmpa@data))
+
 
 ### linear water sldf
 tmpl <- raster::shapefile(paste0(datadir,"/CanadaShapefiles/RiversLines/",
@@ -68,6 +72,8 @@ save(list = ls(all.names = TRUE),
 
 provlist <- c("BC","AB","SK","MB","ON","QC","NB","NS","NF","PE")
 provcode <- c("59","48","47","46","35","24","13","12","10","11")
+provlist <- "ON"
+provcode <- "35"
 
 for (i in 1:length(provlist)) {
   pr <- provlist[[i]]
@@ -113,4 +119,22 @@ for (i in 1:length(provlist)) {
                     overwrite=TRUE)
 }
 
-
+#testing only, don't run
+if (6 == 9) {
+  library(cleangeo)
+  tmpa <- raster::shapefile(paste0(datadir,"/CanadaShapefiles/Lakes+RiversPolygons/",
+                                   "lhy_000c16a_e.shp")) 
+  report <- clgeo_CollectionReport(tmpa)
+  clgeo_SummaryReport(report)
+  
+  tmpah <-  raster::shapefile(paste0(datadir,"/CanadaShapefiles/Coastline/",
+                                         "lhy_000h16a_e.shp"))
+  report <- clgeo_CollectionReport(tmpah)
+  clgeo_SummaryReport(report)
+  tmpah <- clgeo_Clean(tmpah)
+  report <- clgeo_CollectionReport(tmpah)
+  clgeo_SummaryReport(report)
+  raster::shapefile(tmpah,filename=paste0(datadir,"/CanadaShapefiles/Coastline/",
+                                              "lhy_000h16a_e_cleaned.shp"),
+                    overwrite=TRUE)
+} 

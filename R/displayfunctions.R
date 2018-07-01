@@ -1,25 +1,76 @@
-draw3DMapTrack <- function(mapRaster,trackdf=NULL,
-                           featureLevels=c(3,4,4,5), #towns,roads,waterA,waterL
-                           maxElev=3000,vScale=1.5,
-                           rglColorScheme="default",mapColorDepth=16,
-                           citycolor="White",roadcolor="Black",
-                           watercolor="Blue",glaciercolor="White",
-                           rglNAcolor="Blue",rglNegcolor=NA,
-                           rglShininess=0,rglSmooth=TRUE,
-                           rglAlpha=1.0,rglAntiAlias=TRUE,
-                           rglSpecular="black", rglDiffuse="white",
-                           rglAmbient="white", rglEmission="black",
+draw3DMapTrack <- function(mapRaster,
+                           trackdf=NULL,
+                           spList=NULL,  # overrides feature layers in rasterStack 
+                           featureLevels=list("spTown"=townLevel,
+                                              "spRoads"=roadLevel,
+                                              "spWaterA"=waterALevel,
+                                              "spWaterL"=waterLLevel),
+                           maxElev=3000,
+                           vScale=1.5,
+                           drawProj4=NULL,
+                           rglColorScheme="default",
+                           mapColorDepth=16,
+                           citycolor="White",
+                           roadcolor="Black",
+                           watercolor="Blue",
+                           glaciercolor="White",
+                           rglNAcolor="Blue",
+                           rglNegcolor=NA,
+                           rglShininess=0,
+                           rglSmooth=TRUE,
+                           rglAlpha=1.0,
+                           rglAntiAlias=TRUE,
+                           rglSpecular="black", 
+                           rglDiffuse="white",
+                           rglAmbient="white", 
+                           rglEmission="black",
                            rglTheta=0,rglPhi=15,
-                           trackcolor="Magenta",trackCurve=FALSE,
-                           trackCurveElevFromRaster=TRUE,trackCurveHeight=10,
-                           saveRGL=FALSE,mapoutputdir=NA,
+                           trackcolor="Magenta",
+                           trackCurve=FALSE,
+                           trackCurveElevFromRaster=TRUE,
+                           trackCurveHeight=10,
+                           saveRGL=FALSE,
+                           mapoutputdir=NA,
                            outputName="most recent") {
 
+  if (!is.null(drawProj4)) { 
+    if (drawProj4=="UTM") {
+      drawProj4 <- UTMProj4(lon=(extent(mapRaster)[1]+extent(mapRaster)[2])/2,
+                            lat=(extent(mapRaster)[3]+extent(mapRaster)[4])/2)
+    } else if (drawProj4=="Lambert") {
+      drawProj4 <- CRS_LambertAzimuthalEqualArea()
+    } else if (drawProj4=="Albers") {
+      drawProj4 <- CRS_AlbersEqualArea()
+    } 
+    print(paste0("projecting raster to ",drawProj4))
+    if (is.null(spList) | (class(mapRaster)=="RasterLayer")) {
+      mapRaster <- raster::projectRaster(mapRaster,crs=drawProj4,method="ngb")
+    } else {
+      # if spList non-NULL and rasterStack, project only elevation layer
+      mapRaster <- 
+        raster::projectRaster(mapRaster[["elevations"]],crs=drawProj4)
+    }
+    if (!is.null(spList))
+      spList <- list("spTown"=spXformNullOK(spList["spTown"],CRS(drawProj4)),
+                     "spRoads"=spXformNullOK(spList["spRoads"],CRS(drawProj4)),
+                     "spWaterA"=spXformNullOK(spList["spWaterA"],CRS(drawProj4)),
+                     "spWaterL"=spXformNullOK(spList["spWaterL"],CRS(drawProj4)))
+  }
   if (class(mapRaster)=="RasterLayer") {
     elevations <- mapRaster
   } else {
     elevations <- mapRaster[["elevations"]]
+  }
+  if (!is.null(spList)) {
+    mapRaster <- buildFeatureStack(baseLayer=elevations,
+                                   mapshape=NULL,
+                                   spList=spList,
+                                   filterList=featureLevels,
+                                   maxRasterize=10000,
+                                   polySimplify=0,polyMethod="vis",
+                                   polyWeighting=0.85,polySnapInt=0.0001) 
   }  
+
   mmmelev <- raster::as.matrix(elevations)
   x <- seq(1,length.out=nrow(mmmelev))
   y <- seq(1,length.out=ncol(mmmelev))
@@ -61,18 +112,18 @@ draw3DMapTrack <- function(mapRaster,trackdf=NULL,
   if ("town" %in% names(mapRaster)) {
     town <- as.matrix(mapRaster[["town"]])
     town[ is.na(town) ] <- 0
-    col[ town >= featureLevels[1] ] <- gplots::col2hex(citycolor)
+    col[ town >= featureLevels[["spTown"]] ] <- gplots::col2hex(citycolor)
     town <- NULL
   }
   if ("waterA" %in% names(mapRaster)) {
     waterA <- as.matrix(mapRaster[["waterA"]])
     waterA[ is.na(waterA) ] <- 0
-    col[ waterA >= featureLevels[3] ] <- gplots::col2hex(watercolor)
+    col[ waterA >= featureLevels[["spWaterA"]] ] <- gplots::col2hex(watercolor)
   }
   if ("waterL" %in% names(mapRaster)) {
     waterL <- as.matrix(mapRaster[["waterL"]])
     waterL[ is.na(waterL) ] <- 0
-    col[ waterL >= featureLevels[4] ] <- gplots::col2hex(watercolor)
+    col[ waterL >= featureLevels[["spWaterL"]] ] <- gplots::col2hex(watercolor)
     waterL <- NULL    
   }
   if ("waterA" %in% names(mapRaster)) {
@@ -82,7 +133,7 @@ draw3DMapTrack <- function(mapRaster,trackdf=NULL,
   if ("road" %in% names(mapRaster)) {
     road <- as.matrix(mapRaster[["road"]])
     road[ is.na(road) ] <- 0
-    col[ road >= featureLevels[2] ] <- gplots::col2hex(roadcolor)
+    col[ road >= featureLevels[["spRoads"]] ] <- gplots::col2hex(roadcolor)
     road <- NULL
   }
   if (!is.null(trackdf)) {
@@ -147,7 +198,7 @@ draw3DMapTrack <- function(mapRaster,trackdf=NULL,
   return(NULL)
 }
 terrainColors <- function(palettename="default",numshades=206) {
-  print(palettename)
+  print(paste0("drawing map using ",palettename," for color"))
   if (palettename == "beach") {
     terrcolors <- 
       colorRampPalette(c("blue","bisque1","bisque2","bisque3",
@@ -197,20 +248,21 @@ yRatio <- function(rrr) {
   xmax <- rrr@extent@xmax
   ymin <- rrr@extent@ymin
   ymax <- rrr@extent@ymax
-  return(yRatioPts(xmin,xmax,ymin,ymax))
+  lonlat <- grepl("+proj=longlat",crs(rrr,asText=TRUE))
+  return(yRatioPts(xmin,xmax,ymin,ymax,lonlat))
 }
-yRatioPts <- function(xmin,xmax,ymin,ymax) {
-  width <- rasterWidth(xmin,xmax,ymin,ymax)
-  height <- rasterHeight(xmin,xmax,ymin,ymax)
+yRatioPts <- function(xmin,xmax,ymin,ymax,lonlat) {
+  width <- rasterWidth(xmin,xmax,ymin,ymax,lonlat)
+  height <- rasterHeight(xmin,xmax,ymin,ymax,lonlat)
   return(height/width)
 }
-rasterWidth <- function(xmin,xmax,ymin,ymax) {
-  (raster::pointDistance(cbind(xmin,ymin),cbind(xmax,ymin),lonlat=TRUE) +
-   raster::pointDistance(cbind(xmin,ymax),cbind(xmax,ymax),lonlat=TRUE)) / 2
+rasterWidth <- function(xmin,xmax,ymin,ymax,lonlat) {
+  (raster::pointDistance(cbind(xmin,ymin),cbind(xmax,ymin),lonlat=lonlat) +
+   raster::pointDistance(cbind(xmin,ymax),cbind(xmax,ymax),lonlat=lonlat)) / 2
 }
-rasterHeight <- function(xmin,xmax,ymin,ymax) {
-  (raster::pointDistance(cbind(xmin,ymin),cbind(xmin,ymax),lonlat=TRUE) +
-   raster::pointDistance(cbind(xmax,ymin),cbind(xmax,ymax),lonlat=TRUE)) / 2
+rasterHeight <- function(xmin,xmax,ymin,ymax,lonlat) {
+  (raster::pointDistance(cbind(xmin,ymin),cbind(xmin,ymax),lonlat=lonlat) +
+   raster::pointDistance(cbind(xmax,ymin),cbind(xmax,ymax),lonlat=lonlat)) / 2
 }  
 pan3d <- function(button) {
   start <- list()
@@ -236,16 +288,23 @@ pan3d <- function(button) {
   cat("Callbacks set on button", button, "of rgl device", rgl.cur(), "\n")
 }
 getMapImageRaster <- function(mapRaster,mapImageType="bing") {
-  upperLeft <-c(raster::extent(mapRaster)[4],raster::extent(mapRaster)[1])
-  lowerRight <-c(raster::extent(mapRaster)[3],raster::extent(mapRaster)[2])
+  if (grepl("+proj=longlat",crs(mapRaster,asText=TRUE))) {
+    llextent <- raster::extent(mapRaster) 
+  } else {
+    llextent <- raster::extent(raster::projectExtent(mapRaster,
+        crs="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs")) 
+  }
+  upperLeft <-c(llextent[4],llextent[1])
+  lowerRight <-c(llextent[3],llextent[2])
   # calculate zoom based on width/pixel
   metersPerPixel <- rasterHeight(raster::extent(mapRaster)[1],
                                 raster::extent(mapRaster)[2],
                                 raster::extent(mapRaster)[3],
-                                raster::extent(mapRaster)[4])/ncol(mapRaster)
-#print(paste0("meters/pixel =",metersPerPixel))
+                                raster::extent(mapRaster)[4],
+                                lonlat=grepl("+proj=longlat",
+                                             crs(mapRaster,asText=TRUE)) 
+                                ) / ncol(mapRaster)
   zoomcalc <- 13 - floor(max(log2(metersPerPixel/20),0))                   
-#print(paste0("zoomcalc = ",zoomcalc))
   print(paste0("downloading ",mapImageType," map tiles"))
   mapImage <- OpenStreetMap::openmap(upperLeft,lowerRight,
                                      zoom=zoomcalc,type=mapImageType) 
@@ -263,5 +322,16 @@ rgb2hex <- function(r,g,b,colordepth=16) {
       green= round(g*topcolor/255), 
       blue = round(b*topcolor/255), 
       maxColorValue=topcolor) 
+}
+spXformNullOK <- function(sp,crs) {
+  if (is.null(sp)) {
+    return(NULL)
+  } else {
+    if (nrow(sp) >0) {
+      return(spTransform(sp,crs))
+    } else {
+      return(NULL)
+    }
+  }
 }
 
