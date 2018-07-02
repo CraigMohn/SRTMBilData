@@ -1,7 +1,13 @@
-filterFeatures <- function(spList,filterList) {
+filterFeatures <- function(spList,filterList=NULL) {
   #  return a list which is a copy of the input list with each named element
   #    containing the original spatial dataframe with elements less than 
   #    the numeric value with the same name in filterList
+  if (is.null(filterList)) 
+    filterList <- list("spTown"=1,
+                       "spRoads"=1,
+                       "spWaterA"=1,
+                       "spWaterL"=1)
+  
   spListFiltered <- spList
   for (x in names(spList)) {
     if (length(filterList[[x]])>0) {

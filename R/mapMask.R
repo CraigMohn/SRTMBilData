@@ -3,7 +3,7 @@ mapMask <- function(USStatevec=NULL,CAProvincevec=NULL,
                     mapWindow=NULL,
                     mapbuffer=0,mapmergebuffer=10,
                     parkDir,
-                    workProj4="+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs",
+                    workProj4="+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0",
                     year=2017) {
 ##    return a spatial polygon mask for the map 
   if (is.null(USStatevec)&is.null(CAProvincevec)&
@@ -50,7 +50,9 @@ mapMask <- function(USStatevec=NULL,CAProvincevec=NULL,
       worldCountryvec <- unique(toupper(worldCountryvec))
       mcrop <- NULL
       for (c in worldCountryvec) {
-        cmap <- raster::getData("GADM",country=worldCountryvec,level=0) # raster + spatial
+print(c)
+        cmap <- raster::getData("GADM",country=c,level=0)
+plot(cmap)
         cmap <- rgeos::gUnaryUnion(cmap) 
         cmap <-  sp::spTransform(cmap,sp::CRS(workProj4))
         if (is.null(mcrop)) {

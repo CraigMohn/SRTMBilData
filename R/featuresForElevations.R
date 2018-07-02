@@ -42,7 +42,7 @@ elevationsToRaster <- function(rasterFileSetName="default",
                                parkdir=NULL,
                                mapbuffer=0,mapmergebuffer=0,
                                maxrastercells=250000000,
-                               workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
+                               workProj4="+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0",
                                year=2017,
                                resstr="_1arc_v3_bil") {
   
@@ -110,7 +110,7 @@ featuresForElevations <- function(rasterFileSetName,
                                   year=2017,
                                   zeroBufferTowns=FALSE,
                                   zeroBufferWater=FALSE,
-                                  workProj4="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 +no_defs",
+                                  workProj4="+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0",
                                   mapbuffer=0,mapmergebuffer=0,
                                   sliceFeatureBuffer=0,
                                   maxRasterize=100000,
@@ -136,11 +136,11 @@ featuresForElevations <- function(rasterFileSetName,
                         year=year,
                         zeroBufferTowns=zeroBufferTowns,
                         zeroBufferWater=zeroBufferWater)
-  spWaterL <- tmp[["spWaterL"]]
-  spRoads <- tmp[["spRoads"]]
+  spWaterL <- spList[["spWaterL"]]
+  spRoads <- spList[["spRoads"]]
   if (polyClean) {
     spList[["spWaterA"]] <- cleangeo::clgeo_Clean(spList[["spWaterA"]])
-    spTown[["spTown"]] <- cleangeo::clgeo_Clean(spList[["spTown"]])
+    spList[["spTown"]] <- cleangeo::clgeo_Clean(spList[["spTown"]])
   } 
   fvec <- list.files(path=paste0(rasterDir,"/",rasterFileSetName),
                      pattern=paste0(rasterFileSetName,"elevs[0-9]{,2}.grd"))

@@ -5,7 +5,7 @@
 
 buildFeatureStack <- function(baseLayer,mapshape,
                               spList,
-                              filterList,  
+                              filterList=NULL,
                               maxRasterize=10000,
                               sliceFeatureBuffer=0,
                               polySimplify=0,polyMethod="vis",
@@ -27,7 +27,6 @@ buildFeatureStack <- function(baseLayer,mapshape,
       assign(x,NULL)
     }
   }
-spRoads <<- spRoads
   if (length(spRoads)>0) {
     print("roads")
     spRoads <- sxdfMask(spRoads,bLrect)
@@ -134,8 +133,8 @@ spRoads <<- spRoads
                              vals=0)
     print("no towns to add")
   }
-   s <- raster::stack(tlayer,wAlayer,wLlayer,rlayer)
-  names(s) <- c("town","waterA","waterL","road")  
+  s <- raster::stack(tlayer,wAlayer,wLlayer,rlayer)
+  names(s) <- c("town","waterA","waterL","roads")  
   return(s)
 }
 shapeToRasterLayer <- function(sxdf,templateRaster,
@@ -149,7 +148,7 @@ shapeToRasterLayer <- function(sxdf,templateRaster,
   retRaster <- zeroRaster
   
   CP <- as(extent(templateRaster), "SpatialPolygons")
-  sp::proj4string(CP) <- CRS(sp::proj4string(sxdf))
+  sp::proj4string(CP) <- raster::crs(templateRaster)
   sxdf <- sxdfMask(sxdf,CP) 
 
   if (!is.null(sxdf)) {

@@ -26,7 +26,7 @@ loadSavedElevData <- function(savedNameVec,rasterDir,
 }
 loadSavedFeatureData <- function(savedNameVec,rasterDir,
                                  noisy=FALSE,silent=FALSE) {
-  lnames <- c("town","waterA","waterL","road")
+  lnames <- c("town","waterA","waterL","roads")
   rStack <- NULL
   for (layername in lnames) {
     j <- 1

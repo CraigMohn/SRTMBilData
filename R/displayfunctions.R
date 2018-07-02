@@ -1,10 +1,7 @@
 draw3DMapTrack <- function(mapRaster,
                            trackdf=NULL,
                            spList=NULL,  # overrides feature layers in rasterStack 
-                           featureLevels=list("spTown"=townLevel,
-                                              "spRoads"=roadLevel,
-                                              "spWaterA"=waterALevel,
-                                              "spWaterL"=waterLLevel),
+                           featureLevels=NULL,
                            maxElev=3000,
                            vScale=1.5,
                            drawProj4=NULL,
@@ -32,6 +29,12 @@ draw3DMapTrack <- function(mapRaster,
                            saveRGL=FALSE,
                            mapoutputdir=NA,
                            outputName="most recent") {
+  
+  if (is.null(featureLevels)) 
+    featureLevels <- list("spTown"=1,
+                          "spRoads"=1,
+                          "spWaterA"=1,
+                          "spWaterL"=1)
 
   if (!is.null(drawProj4)) { 
     if (drawProj4=="UTM") {
@@ -50,11 +53,11 @@ draw3DMapTrack <- function(mapRaster,
       mapRaster <- 
         raster::projectRaster(mapRaster[["elevations"]],crs=drawProj4)
     }
-    if (!is.null(spList))
-      spList <- list("spTown"=spXformNullOK(spList["spTown"],CRS(drawProj4)),
-                     "spRoads"=spXformNullOK(spList["spRoads"],CRS(drawProj4)),
-                     "spWaterA"=spXformNullOK(spList["spWaterA"],CRS(drawProj4)),
-                     "spWaterL"=spXformNullOK(spList["spWaterL"],CRS(drawProj4)))
+    if (!is.null(spList)) {
+      for (x in names(spList)) {
+        spList[[x]] <-  spXformNullOK(spList[[x]],CRS(drawProj4))
+      }
+    }
   }
   if (class(mapRaster)=="RasterLayer") {
     elevations <- mapRaster
@@ -66,7 +69,7 @@ draw3DMapTrack <- function(mapRaster,
                                    mapshape=NULL,
                                    spList=spList,
                                    filterList=featureLevels,
-                                   maxRasterize=10000,
+                                   maxRasterize=50000,
                                    polySimplify=0,polyMethod="vis",
                                    polyWeighting=0.85,polySnapInt=0.0001) 
   }  
@@ -130,8 +133,8 @@ draw3DMapTrack <- function(mapRaster,
       col[ waterA == 8 ] <- gplots::col2hex(glaciercolor) # Glaciers overwrite other water
       waterA <- NULL
   }
-  if ("road" %in% names(mapRaster)) {
-    road <- as.matrix(mapRaster[["road"]])
+  if ("roads" %in% names(mapRaster)) {
+    road <- as.matrix(mapRaster[["roads"]])
     road[ is.na(road) ] <- 0
     col[ road >= featureLevels[["spRoads"]] ] <- gplots::col2hex(roadcolor)
     road <- NULL
@@ -327,7 +330,7 @@ spXformNullOK <- function(sp,crs) {
   if (is.null(sp)) {
     return(NULL)
   } else {
-    if (nrow(sp) >0) {
+    if (nrow(sp) > 0) {
       return(spTransform(sp,crs))
     } else {
       return(NULL)

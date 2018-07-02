@@ -1,9 +1,12 @@
 bufferUnion <- function(spObj,mapbuffer,mapunion,
-                        outCRS="+proj=longlat +ellps=WGS84 +towgs84=0,0,0 +no_defs",
+                        outCRS="",
                         bufferCRS="+init=epsg:3857",
                         capStyle="FLAT",
                         joinStyle="BEVEL",
                         simplifytol=0) {
+  if (missing(outCRS)){
+    outCRS <- sp::proj4string(spObj)
+  }
   if (mapbuffer > 0) {
     spObj <- rgeos::gBuffer(sp::spTransform( spObj, CRS( bufferCRS ) ),
                             width=1.5*mapbuffer,
@@ -89,9 +92,9 @@ UTMzone <- function(lon) {
   return((floor((lon + 180)/6) %% 60) + 1) 
 }
 CRS_LambertAzimuthalEqualArea <- function() {
-  "+proj=laea +lat_0=45 +lon_0=-100 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
+  "+proj=laea +lat_0=45 +lon_0=-100 +x_0=0 +y_0=0 +a=6370997 +b=6370997 +units=m +no_defs "
 }
 CRS_AlbersEqualArea <- function() {
-  "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs "
+  "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs "
 }
 
