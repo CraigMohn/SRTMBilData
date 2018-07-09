@@ -62,35 +62,35 @@ mapWindow <- NULL
 # mapWindow <- c(-123.2,-122.4,48.3,48.8)     # San Juans
 # mapWindow <- c(-122.2,-121.7,47.4,47.8)     # Samm Area 
 # mapWindow <- c(-62.0,-59.5,45.4,47.11)      # Cape Breton Island 
-mapWindow <- c(-123.1,-120.9,36.4,38.4)     # SF Bay
+# mapWindow <- c(-123.1,-120.9,36.4,38.4)     # SF Bay
 
-drawMapRGL(USStatevec=NULL,
-           CAProvincevec=NULL,
-           worldCountryvec=c("NOR","SWE","DNK") ,
+drawMapRGL(USStatevec="PacificNorthwest",
+           CAProvincevec=c("BC","AB","SK"),
+           #worldCountryvec=c("NOR","SWE","DNK") ,
            mapWindow=mapWindow,
            mapbuffer=0,
-           #rasterFileSetNames="NewEngland",
+           #rasterFileSetNames="Scandinavia",
            cropbox=cropbox,
-           elevDataSource="SRTM",
-           featureDataSource="none",
-           townLevel=5,roadLevel=3,waterALevel=4,waterLLevel=5,
-           vScale=1.0,maxElev=2000,
-           rglColorScheme="oslo",
+           elevDataSource="Raster",
+           featureDataSource="Raster",
+           townLevel=5,roadLevel=4,waterALevel=5,waterLLevel=6,
+           vScale=1.0,maxElev=3500,
+           rglColorScheme="bing",rglSmooth=TRUE,
            #citycolor="purple",
            #writeElevFile=TRUE,
            #writeFeatureFile=TRUE,
            year=2017,
            rasterDir=rasterDir,
-           #mapDataDir=mapDataDir,
+           mapDataDir=mapDataDir,
            shapefileDir=shapefileDir,includeAllRoads=TRUE,
            maxrastercells=300000000,
            saveRGL=TRUE,
-           res3d=2400,
+           res3d=2200,
            maxRasterize=200000,zeroBufferWater=TRUE,zeroBufferTowns=TRUE,
-           drawProj4="UTM", # "UTM","Lambert","Albers"
+           drawProj4="Lambert", # "UTM","Lambert","Albers"
            mapoutputdir=mapoutputdir,
            #rasterFileSetWriteName="NSTest",
-           outputName="Scandinavia",
+           outputName="PacificNorthwest Bing",
            noisy=TRUE)
 
 stop()

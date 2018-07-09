@@ -165,6 +165,9 @@ drawMapRGL <- function(paths=NULL,
                        polyWeighting=0.85,polySnapInt=0.0001,
                        silent=FALSE,noisy=TRUE) {
 
+  elevDataSource <- argCaseFix(elevDataSource,c("Raster","SRTM"))
+  featureDataSource <- argCaseFix(featureDataSource,c("Raster","Shapefiles","TIGER"))
+
   filterList <- list("spTown"=townLevel,
                      "spRoads"=roadLevel,
                      "spWaterA"=waterALevel,
@@ -303,7 +306,7 @@ drawMapRGL <- function(paths=NULL,
                             polyMethod=polyMethod, 
                             polyWeighting=polyWeighting,
                             polySnapInt=polySnapInt)
-      featureStack <- loadSavedFeatureData(savedNameVec,rasterDir)
+      featureStack <- loadSavedFeatureData(elevfname,rasterDir)
     } else {
       spList <- loadShapeFiles(USStatevec=USStatevec,
                             CAProvincevec=CAProvincevec,

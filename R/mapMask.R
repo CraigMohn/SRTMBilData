@@ -50,9 +50,7 @@ mapMask <- function(USStatevec=NULL,CAProvincevec=NULL,
       worldCountryvec <- unique(toupper(worldCountryvec))
       mcrop <- NULL
       for (c in worldCountryvec) {
-print(c)
         cmap <- raster::getData("GADM",country=c,level=0)
-plot(cmap)
         cmap <- rgeos::gUnaryUnion(cmap) 
         cmap <-  sp::spTransform(cmap,sp::CRS(workProj4))
         if (is.null(mcrop)) {

@@ -82,6 +82,11 @@ shapes_for_states <- function(statevec,
                          writeShapefiles=TRUE,shapefiledir)
   return("done")
 }
+argCaseFix <- function(argchar,validCase) {
+  for (x in validCase) {
+    if (toupper(argchar)==toupper(x)) return(x)
+  }
+}
 UTMProj4 <- function(lon,lat) {
   hemisphere <- ifelse(lat > 0,"+north","+south")
   return(paste0("+proj=utm +zone=",UTMzone(lon)," ",hemisphere,

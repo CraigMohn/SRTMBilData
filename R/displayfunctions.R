@@ -308,9 +308,10 @@ getMapImageRaster <- function(mapRaster,mapImageType="bing") {
                                              crs(mapRaster,asText=TRUE)) 
                                 ) / ncol(mapRaster)
   zoomcalc <- 13 - floor(max(log2(metersPerPixel/20),0))                   
-  print(paste0("downloading ",mapImageType," map tiles"))
+  print(paste0("downloading ",mapImageType," map tiles, zoom = ",zoomcalc))
   mapImage <- OpenStreetMap::openmap(upperLeft,lowerRight,
                                      zoom=zoomcalc,type=mapImageType) 
+  gc()
   print(paste0("projecting ",mapImageType," map tiles"))
   mapImage <- OpenStreetMap::openproj(mapImage,
                                       projection=raster::crs(mapRaster)) 
